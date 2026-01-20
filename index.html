@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diligent Console - AI Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Welcome Section -->
+        <header class="welcome-section">
+            <h1 class="welcome-title">Welcome back, Sara.</h1>
+            <p class="welcome-subtitle">What would you like to do today?</p>
+        </header>
+
+        <!-- Quick Action Buttons -->
+        <div class="quick-actions">
+            <button class="action-btn" id="criticalBtn">
+                <div class="action-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    <span class="badge" id="criticalCount">3</span>
+                </div>
+                <span class="action-label">Critical Notifications</span>
+            </button>
+
+            <button class="action-btn" id="chatsBtn">
+                <div class="action-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span class="badge" id="chatsCount">7</span>
+                </div>
+                <span class="action-label">Updated Chats</span>
+            </button>
+
+            <button class="action-btn" id="appointBtn">
+                <div class="action-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </div>
+                <span class="action-label">Appoint a Director</span>
+            </button>
+
+            <button class="action-btn" id="openAppBtn">
+                <div class="action-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                </div>
+                <span class="action-label">Open Application</span>
+            </button>
+        </div>
+
+        <!-- AI Prompt Section -->
+        <div class="prompt-section">
+            <div class="prompt-container">
+                <textarea 
+                    id="promptInput" 
+                    class="prompt-input" 
+                    placeholder="Ask me anything or describe what you'd like to do..."
+                    rows="1"
+                ></textarea>
+                <button class="send-btn" id="sendBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+            <div class="prompt-suggestions">
+                <button class="suggestion-chip">Review board documents</button>
+                <button class="suggestion-chip">Schedule meeting</button>
+                <button class="suggestion-chip">Generate compliance report</button>
+            </div>
+        </div>
+
+        <!-- Response Area (hidden by default) -->
+        <div class="response-area" id="responseArea" style="display: none;">
+            <div class="response-content" id="responseContent"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
