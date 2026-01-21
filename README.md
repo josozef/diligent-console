@@ -1,6 +1,6 @@
-# Diligent Console - AI Assistant
+# Board Member Appointment Application
 
-A professional, minimalist Hero-style AI web application designed for board governance and administrative tasks. Built with the **wireframe-kit** design system for a clean, grayscale aesthetic.
+A professional, minimalist AI-powered web application dedicated to streamlining the board member appointment process. Features an intelligent concierge system that automates document generation, approvals, and regulatory filings.
 
 ## Features
 
@@ -63,9 +63,9 @@ Special workflows like "Appoint a Director" display an interactive form within t
 
 ## Design
 
-- **Design System**: Built on wireframe-kit with CSS custom properties
+- **Design System**: Built with CSS custom properties for consistency
 - **Theme**: Light, professional, minimalist grayscale
-- **Color Palette**: Neutral grayscale (gray-50 to gray-900) for a clean, wireframe aesthetic
+- **Color Palette**: Neutral grayscale (gray-50 to gray-900) for a clean, professional aesthetic
 - **Typography**: System fonts with consistent sizing scale (text-xs to text-3xl)
 - **Spacing**: Consistent spacing scale using CSS variables (space-1 to space-16)
 - **Responsive**: Works on desktop, tablet, and mobile devices
@@ -122,14 +122,14 @@ Certain workflows present interactive forms within the chat:
 
 - **User name**: Update in `index.html` (line 14)
 - **Notification counts**: Adjust badge values in the HTML
-- **Colors**: Modify CSS custom properties in `wireframe-kit/styles/wireframe.css`
-- **Spacing & Typography**: Adjust design tokens in the wireframe CSS
-- **Custom styles**: Override in `styles.css` while maintaining wireframe-kit variables
+- **Colors**: Modify CSS custom properties in `styles.css` (at the top of the file)
+- **Spacing & Typography**: Adjust design tokens in the CSS variables
+- **Custom styles**: Add custom styles in `styles.css`
 - **AI Integration**: Connect to actual AI API in `script.js` (replace mock responses)
 
 ## Design System Variables
 
-The app uses CSS custom properties from wireframe-kit:
+The app uses CSS custom properties defined in `styles.css`:
 
 ```css
 /* Colors */

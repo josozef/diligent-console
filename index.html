@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Diligent Console - AI Assistant</title>
-    <link rel="stylesheet" href="wireframe-kit/styles/wireframe.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -95,19 +94,20 @@
         <!-- Left Sidebar: Chat History -->
         <aside class="chat-sidebar" id="chatSidebar">
             <div class="sidebar-header">
-                <button class="back-btn" id="backToHeroBtn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="19" y1="12" x2="5" y2="12"></line>
-                        <polyline points="12 19 5 12 12 5"></polyline>
-                    </svg>
-                    <span>Home</span>
-                </button>
+                <h3 class="sidebar-title">Conversations</h3>
                 <button class="new-chat-btn" id="newChatBtn">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
                 </button>
+            </div>
+            <div class="chat-sort-control">
+                <label class="sort-label">Sort by:</label>
+                <select class="sort-select" id="chatSortSelect">
+                    <option value="recent_updates">Recent Updates</option>
+                    <option value="most_recent">Most Recent</option>
+                </select>
             </div>
             <div class="chat-history" id="chatHistory">
                 <!-- Chat history items will be inserted here -->

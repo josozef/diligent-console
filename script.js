@@ -6,6 +6,13 @@ let currentView = 'hero'; // 'hero' or 'chat'
 let chats = []; // Array of all chat sessions
 let currentChatId = null;
 let messageCounter = 0;
+let chatSortMode = 'recent_updates'; // 'most_recent' or 'recent_updates'
+
+// Process tracking state
+let processRunning = false;
+let processPaused = false;
+let currentAppointment = null; // Stores current appointment details
+let processSteps = []; // Stores current workflow steps with statuses
 
 // ============================================
 // HERO VIEW ELEMENTS
@@ -144,7 +151,10 @@ function createNewChat(initialMessage) {
         title: initialMessage.substring(0, 50) + (initialMessage.length > 50 ? '...' : ''),
         messages: [],
         createdAt: new Date(),
-        preview: initialMessage.substring(0, 60)
+        preview: initialMessage.substring(0, 60),
+        hasUpdate: false,
+        hasWorkflow: false,
+        lastUpdate: null
     };
     
     chats.unshift(chat);
@@ -164,6 +174,121 @@ function createNewChat(initialMessage) {
     }, 800);
 }
 
+// Initialize mock chats for corporate governance
+function initializeMockChats() {
+    const now = new Date();
+    
+    const mockChats = [
+        {
+            id: 'mock-1',
+            title: 'Board Meeting Q1 2026 - Agenda Review',
+            preview: 'Can you help me prepare the agenda for our Q1 board meeting?',
+            createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+            lastUpdate: new Date(now - 3 * 60 * 60 * 1000), // 3 hours ago
+            hasUpdate: true,
+            hasWorkflow: false,
+            messages: []
+        },
+        {
+            id: 'mock-2',
+            title: 'Compliance Audit Preparation',
+            preview: 'I need to prepare documentation for our upcoming compliance audit...',
+            createdAt: new Date(now - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+            lastUpdate: new Date(now - 1 * 60 * 60 * 1000), // 1 hour ago
+            hasUpdate: true,
+            hasWorkflow: false,
+            messages: []
+        },
+        {
+            id: 'mock-3',
+            title: 'Annual Report Draft Review',
+            preview: 'Please review the financial disclosures in the annual report draft',
+            createdAt: new Date(now - 7 * 24 * 60 * 60 * 1000), // 7 days ago
+            lastUpdate: null,
+            hasUpdate: false,
+            hasWorkflow: false,
+            messages: []
+        },
+        {
+            id: 'mock-4',
+            title: 'Executive Compensation Committee Meeting',
+            preview: 'Prepare materials for the executive compensation discussion',
+            createdAt: new Date(now - 10 * 24 * 60 * 60 * 1000), // 10 days ago
+            lastUpdate: null,
+            hasUpdate: false,
+            hasWorkflow: false,
+            messages: []
+        },
+        {
+            id: 'mock-5',
+            title: 'Subsidiary Incorporation - Singapore',
+            preview: 'Walk me through the process of incorporating a subsidiary in Singapore',
+            createdAt: new Date(now - 14 * 24 * 60 * 60 * 1000), // 14 days ago
+            lastUpdate: null,
+            hasUpdate: false,
+            hasWorkflow: false,
+            messages: []
+        },
+        {
+            id: 'mock-6',
+            title: 'Risk Assessment Framework Update',
+            preview: 'Update our enterprise risk assessment framework based on new regulations',
+            createdAt: new Date(now - 18 * 24 * 60 * 60 * 1000), // 18 days ago
+            lastUpdate: null,
+            hasUpdate: false,
+            hasWorkflow: false,
+            messages: []
+        },
+        {
+            id: 'mock-7',
+            title: 'Board Resolution - Share Buyback',
+            preview: 'Draft a board resolution approving the share buyback program',
+            createdAt: new Date(now - 21 * 24 * 60 * 60 * 1000), // 21 days ago
+            lastUpdate: null,
+            hasUpdate: false,
+            hasWorkflow: false,
+            messages: []
+        },
+        {
+            id: 'mock-8',
+            title: 'Conflict of Interest Policy Review',
+            preview: 'Review and update our conflict of interest policy for directors',
+            createdAt: new Date(now - 25 * 24 * 60 * 60 * 1000), // 25 days ago
+            lastUpdate: null,
+            hasUpdate: false,
+            hasWorkflow: false,
+            messages: []
+        },
+        {
+            id: 'mock-9',
+            title: 'Quarterly Board Book Preparation',
+            preview: 'Help me compile and organize the Q4 board book materials',
+            createdAt: new Date(now - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+            lastUpdate: null,
+            hasUpdate: false,
+            hasWorkflow: false,
+            messages: []
+        },
+        {
+            id: 'mock-10',
+            title: 'Director Independence Assessment',
+            preview: 'Assess the independence status of our current board members',
+            createdAt: new Date(now - 35 * 24 * 60 * 60 * 1000), // 35 days ago
+            lastUpdate: null,
+            hasUpdate: false,
+            hasWorkflow: false,
+            messages: []
+        }
+    ];
+    
+    chats = [...mockChats];
+    
+    // Initial display
+    if (currentView === 'chat') {
+        updateChatHistoryDisplay();
+    }
+}
+
 function addMessageToChat(chatId, role, content) {
     const chat = chats.find(c => c.id === chatId);
     if (!chat) return;
@@ -181,6 +306,9 @@ function addMessageToChat(chatId, role, content) {
     if (role === 'user' && chat.messages.length === 1) {
         chat.preview = content.substring(0, 60);
     }
+    
+    // Update last update time
+    chat.lastUpdate = new Date();
     
     // If this is the current chat, update the thread
     if (chatId === currentChatId) {
@@ -235,13 +363,47 @@ function loadChat(chatId) {
 function updateChatHistoryDisplay() {
     chatHistory.innerHTML = '';
     
-    chats.forEach(chat => {
+    // Sort chats based on selected mode
+    let sortedChats = [...chats];
+    if (chatSortMode === 'recent_updates') {
+        sortedChats.sort((a, b) => {
+            // Workflow in progress always on top
+            if (a.hasWorkflow && !b.hasWorkflow) return -1;
+            if (!a.hasWorkflow && b.hasWorkflow) return 1;
+            
+            // Then by recent updates
+            if (a.hasUpdate && !b.hasUpdate) return -1;
+            if (!a.hasUpdate && b.hasUpdate) return 1;
+            
+            // Then by last update time
+            const aTime = a.lastUpdate || a.createdAt;
+            const bTime = b.lastUpdate || b.createdAt;
+            return bTime - aTime;
+        });
+    } else {
+        // Most recent: sort by creation date
+        sortedChats.sort((a, b) => b.createdAt - a.createdAt);
+    }
+    
+    sortedChats.forEach(chat => {
         const item = document.createElement('div');
         item.className = `chat-history-item ${chat.id === currentChatId ? 'active' : ''}`;
+        
+        // Build badges HTML
+        let badgesHTML = '';
+        if (chat.hasWorkflow) {
+            badgesHTML = '<span class="chat-badge workflow-badge"><span class="workflow-pulse"></span></span>';
+        } else if (chat.hasUpdate) {
+            badgesHTML = '<span class="chat-badge update-badge"></span>';
+        }
+        
         item.innerHTML = `
-            <div class="chat-history-title">${chat.title}</div>
+            <div class="chat-history-header">
+                <div class="chat-history-title">${chat.title}</div>
+                ${badgesHTML}
+            </div>
             <div class="chat-history-preview">${chat.preview}</div>
-            <div class="chat-history-time">${formatTime(chat.createdAt)}</div>
+            <div class="chat-history-time">${formatTime(chat.lastUpdate || chat.createdAt)}</div>
         `;
         item.addEventListener('click', () => loadChat(chat.id));
         chatHistory.appendChild(item);
@@ -309,12 +471,16 @@ chatSendBtn.addEventListener('click', sendChatMessage);
 // PANEL CONTROLS
 // ============================================
 
-// Back to hero view
-backToHeroBtn.addEventListener('click', transitionToHeroView);
-
 // New chat
 newChatBtn.addEventListener('click', () => {
     chatInput.focus();
+});
+
+// Chat sort control
+const chatSortSelect = document.getElementById('chatSortSelect');
+chatSortSelect.addEventListener('change', (e) => {
+    chatSortMode = e.target.value;
+    updateChatHistoryDisplay();
 });
 
 // Toggle right panel
@@ -956,9 +1122,65 @@ function closeAppointmentPanel() {
 }
 
 function startAppointmentWorkflow() {
-    // Close the panel
-    chatView.classList.remove('show-right-panel');
+    // Initialize process state
+    processRunning = true;
+    processPaused = false;
     
+    // Mark current chat as having a workflow
+    const chat = chats.find(c => c.id === currentChatId);
+    if (chat) {
+        chat.hasWorkflow = true;
+        chat.lastUpdate = new Date();
+    }
+    
+    // Store appointment context
+    currentAppointment = {
+        company: 'Pacific Polymer Logistics Pte. Ltd.',
+        companyMeta: 'Subsidiary of Acme, Co (USA) • Domiciled in Singapore',
+        resigningDirector: 'Wei Chen',
+        resigningDirectorTitle: 'Current Board Member',
+        appointee: 'Priya Nair',
+        appointeeTitle: 'Incoming Director'
+    };
+    
+    // Initialize workflow steps with sub-statuses
+    processSteps = [
+        {
+            id: 'board-approval',
+            name: 'Create Board Approval',
+            description: 'Submit Board Resolution to the Boards system for asynchronous approval',
+            substeps: [
+                { id: 'approval-create', name: 'Create approval request', status: 'completed', time: '2 min ago' },
+                { id: 'approval-send', name: 'Send to board members', status: 'in_progress', time: null },
+                { id: 'approval-return', name: 'Await approval responses', status: 'pending', time: null }
+            ]
+        },
+        {
+            id: 'regulatory-forms',
+            name: 'Email Regulatory Forms',
+            description: 'Send Consent to Act and ACRA forms to appointee for signature',
+            substeps: [
+                { id: 'forms-create', name: 'Generate regulatory forms', status: 'pending', time: null },
+                { id: 'forms-send', name: 'Email forms to Priya Nair', status: 'pending', time: null },
+                { id: 'forms-receive', name: 'Receive signed documents', status: 'pending', time: null },
+                { id: 'forms-validate', name: 'Validate form completeness', status: 'pending', time: null }
+            ]
+        },
+        {
+            id: 'entity-update',
+            name: 'Update Entity Records',
+            description: 'Update Entities system to reflect board changes',
+            substeps: [
+                { id: 'entity-resign', name: 'Record Wei Chen resignation', status: 'pending', time: null },
+                { id: 'entity-appoint', name: 'Record Priya Nair appointment', status: 'pending', time: null }
+            ]
+        }
+    ];
+    
+    // Open the In-Progress status panel
+    openInProgressPanel();
+    
+    // Add a message to the chat with button to reopen panel
     if (currentChatId) {
         addMessageToChat(currentChatId, 'assistant', 
             `<div class="workflow-initiated">
@@ -966,26 +1188,265 @@ function startAppointmentWorkflow() {
                 <p style="color: var(--color-gray-700); margin-bottom: var(--space-3);">
                     I'm coordinating the appointment of Priya Nair to Pacific Polymer Logistics Pte. Ltd.
                 </p>
-                <div style="background: var(--color-gray-50); border: 1px solid var(--color-gray-200); border-radius: var(--radius-md); padding: var(--space-3);">
-                    <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2);">
-                        <div class="status-indicator status-active"></div>
-                        <strong style="color: var(--color-gray-900);">Step 1:</strong> Creating board approval in Boards system...
-                    </div>
-                    <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2);">
-                        <div class="status-indicator status-pending"></div>
-                        <strong style="color: var(--color-gray-900);">Step 2:</strong> Waiting to email forms to Priya Nair
-                    </div>
-                    <div style="display: flex; align-items: center; gap: var(--space-2);">
-                        <div class="status-indicator status-pending"></div>
-                        <strong style="color: var(--color-gray-900);">Step 3:</strong> Waiting to update entity records
-                    </div>
-                </div>
-                <p style="color: var(--color-gray-600); font-size: var(--text-sm); margin-top: var(--space-3);">
+                <p style="color: var(--color-gray-600); font-size: var(--text-sm);">
                     I'll keep you updated as each step completes. You can continue working while I handle this in the background.
                 </p>
+                <button class="preview-panel-btn" onclick="reopenStatusPanel()" style="margin-top: var(--space-3);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                    </svg>
+                    View Process Status
+                </button>
             </div>`
         );
     }
+    
+    // Simulate live updates
+    simulateLiveUpdates();
+}
+
+function openInProgressPanel() {
+    // Show the right panel
+    chatView.classList.add('show-right-panel');
+    
+    // Update panel title
+    document.querySelector('.right-panel-title').textContent = 'Process Status';
+    
+    // Populate the panel content
+    const panelContent = document.querySelector('.right-panel-content');
+    panelContent.innerHTML = generateInProgressPanel();
+}
+
+function generateInProgressPanel() {
+    const runningBadge = processPaused 
+        ? '<span class="status-badge status-paused">Paused</span>'
+        : '<span class="status-badge status-running"><span class="pulse-dot"></span>Running</span>';
+    
+    return `
+        <div class="in-progress-panel">
+            <!-- Header with Status -->
+            <section class="panel-section">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3);">
+                    <div>
+                        <h4 class="panel-section-title" style="margin-bottom: var(--space-1);">Director Appointment</h4>
+                        ${runningBadge}
+                    </div>
+                    <div style="display: flex; gap: var(--space-2);">
+                        ${processPaused 
+                            ? `<button class="panel-btn-danger" onclick="cancelProcess()">Cancel Process</button>
+                               <button class="panel-btn-primary" onclick="toggleProcessPause()">Resume</button>`
+                            : `<button class="panel-btn-secondary" onclick="toggleProcessPause()">Pause</button>`
+                        }
+                    </div>
+                </div>
+            </section>
+
+            <!-- Context Summary -->
+            <section class="panel-section">
+                <h4 class="panel-section-title">Appointment Details</h4>
+                
+                <div class="summary-card-compact">
+                    <div class="summary-item-compact">
+                        <label class="summary-label">Company</label>
+                        <div class="summary-value">${currentAppointment.company}</div>
+                    </div>
+                    
+                    <div class="summary-item-compact">
+                        <label class="summary-label">Resigning Director</label>
+                        <div class="summary-value">${currentAppointment.resigningDirector}</div>
+                    </div>
+                    
+                    <div class="summary-item-compact">
+                        <label class="summary-label">Appointee</label>
+                        <div class="summary-value">${currentAppointment.appointee}</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Workflow Progress -->
+            <section class="panel-section" style="flex: 1; overflow-y: auto;">
+                <h4 class="panel-section-title">Workflow Progress</h4>
+                
+                <div class="process-steps">
+                    ${processSteps.map((step, stepIdx) => generateStepHTML(step, stepIdx)).join('')}
+                </div>
+            </section>
+
+            ${processPaused ? `
+                <section class="panel-section" style="background: var(--color-gray-50); border-top: 1px solid var(--color-gray-200);">
+                    <div style="display: flex; align-items: center; gap: var(--space-3);">
+                        <div style="color: var(--color-gray-600);">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="10" y1="15" x2="10" y2="9"></line>
+                                <line x1="14" y1="15" x2="14" y2="9"></line>
+                            </svg>
+                        </div>
+                        <div>
+                            <p style="font-weight: 600; color: var(--color-gray-900); margin-bottom: var(--space-1);">Process Paused</p>
+                            <p style="font-size: var(--text-sm); color: var(--color-gray-600);">
+                                The workflow has been paused. You can resume to continue or cancel to stop entirely.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+            ` : ''}
+        </div>
+    `;
+}
+
+function generateStepHTML(step, stepIdx) {
+    // Determine overall step status
+    const allCompleted = step.substeps.every(s => s.status === 'completed');
+    const hasInProgress = step.substeps.some(s => s.status === 'in_progress');
+    const allPending = step.substeps.every(s => s.status === 'pending');
+    
+    let stepStatusClass = 'step-pending';
+    if (allCompleted) stepStatusClass = 'step-completed';
+    else if (hasInProgress) stepStatusClass = 'step-active';
+    
+    return `
+        <div class="process-step ${stepStatusClass}">
+            <div class="process-step-header">
+                <div class="process-step-number">${stepIdx + 1}</div>
+                <div class="process-step-info">
+                    <div class="process-step-title">${step.name}</div>
+                    <div class="process-step-description">${step.description}</div>
+                </div>
+            </div>
+            
+            <div class="process-substeps">
+                ${step.substeps.map(substep => `
+                    <div class="process-substep ${substep.status}">
+                        <div class="substep-indicator">
+                            ${getStatusIcon(substep.status)}
+                        </div>
+                        <div class="substep-content">
+                            <div class="substep-name">${substep.name}</div>
+                            ${substep.status === 'in_progress' 
+                                ? '<div class="substep-meta">In progress...</div>'
+                                : substep.time 
+                                    ? `<div class="substep-meta">Completed ${substep.time}</div>`
+                                    : ''
+                            }
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function getStatusIcon(status) {
+    switch(status) {
+        case 'completed':
+            return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        case 'in_progress':
+            return '<div class="spinner-small"></div>';
+        case 'pending':
+        default:
+            return '<div class="pending-dot"></div>';
+    }
+}
+
+function toggleProcessPause() {
+    processPaused = !processPaused;
+    
+    // Refresh the panel
+    if (chatView.classList.contains('show-right-panel')) {
+        const panelContent = document.querySelector('.right-panel-content');
+        panelContent.innerHTML = generateInProgressPanel();
+    }
+    
+    // Update message in chat
+    if (currentChatId) {
+        const status = processPaused ? 'paused' : 'resumed';
+        addMessageToChat(currentChatId, 'assistant', 
+            `Process ${status}. ${processPaused ? 'You can resume or cancel the process.' : 'Continuing workflow...'}`
+        );
+    }
+    
+    // If resuming, restart live updates
+    if (!processPaused) {
+        simulateLiveUpdates();
+    }
+}
+
+function cancelProcess() {
+    processRunning = false;
+    processPaused = false;
+    
+    // Remove workflow indicator from current chat
+    const chat = chats.find(c => c.id === currentChatId);
+    if (chat) {
+        chat.hasWorkflow = false;
+    }
+    
+    // Close the panel
+    chatView.classList.remove('show-right-panel');
+    
+    if (currentChatId) {
+        addMessageToChat(currentChatId, 'assistant', 
+            'Appointment process cancelled. All pending actions have been stopped. Let me know if you need anything else.'
+        );
+    }
+}
+
+function reopenStatusPanel() {
+    if (processRunning) {
+        openInProgressPanel();
+    } else {
+        openAppointmentPanel();
+    }
+}
+
+function simulateLiveUpdates() {
+    if (!processRunning || processPaused) return;
+    
+    // Simulate progress through substeps
+    let updateIndex = 0;
+    const updates = [
+        { stepId: 'board-approval', substepId: 'approval-send', status: 'completed', time: '1 min ago', delay: 2000 },
+        { stepId: 'board-approval', substepId: 'approval-return', status: 'in_progress', time: null, delay: 3000 },
+        { stepId: 'board-approval', substepId: 'approval-return', status: 'completed', time: 'Just now', delay: 5000 },
+        { stepId: 'regulatory-forms', substepId: 'forms-create', status: 'in_progress', time: null, delay: 2000 },
+        { stepId: 'regulatory-forms', substepId: 'forms-create', status: 'completed', time: 'Just now', delay: 3000 },
+        { stepId: 'regulatory-forms', substepId: 'forms-send', status: 'in_progress', time: null, delay: 2000 },
+        { stepId: 'regulatory-forms', substepId: 'forms-send', status: 'completed', time: 'Just now', delay: 4000 },
+        { stepId: 'regulatory-forms', substepId: 'forms-receive', status: 'in_progress', time: null, delay: 1000 }
+    ];
+    
+    function applyUpdate() {
+        if (!processRunning || processPaused || updateIndex >= updates.length) return;
+        
+        const update = updates[updateIndex];
+        
+        // Find and update the substep
+        const step = processSteps.find(s => s.id === update.stepId);
+        if (step) {
+            const substep = step.substeps.find(s => s.id === update.substepId);
+            if (substep) {
+                substep.status = update.status;
+                substep.time = update.time;
+                
+                // Refresh the panel if it's open
+                if (chatView.classList.contains('show-right-panel')) {
+                    const panelContent = document.querySelector('.right-panel-content');
+                    panelContent.innerHTML = generateInProgressPanel();
+                }
+            }
+        }
+        
+        updateIndex++;
+        
+        if (updateIndex < updates.length) {
+            setTimeout(applyUpdate, updates[updateIndex].delay);
+        }
+    }
+    
+    // Start the first update
+    setTimeout(applyUpdate, updates[0].delay);
 }
 
 // ============================================
@@ -1013,9 +1474,13 @@ if (!document.getElementById('loading-style')) {
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
     `;
     document.head.appendChild(style);
 }
+
+// ============================================
+// INITIALIZE
+// ============================================
+
+// Initialize mock chats on page load
+initializeMockChats();
