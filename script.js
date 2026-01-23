@@ -29,10 +29,9 @@ const responseArea = document.getElementById('responseArea');
 const responseContent = document.getElementById('responseContent');
 
 // Quick action buttons
-const criticalBtn = document.getElementById('criticalBtn');
 const chatsBtn = document.getElementById('chatsBtn');
-const appointBtn = document.getElementById('appointBtn');
 const openAppBtn = document.getElementById('openAppBtn');
+const appDropdown = document.getElementById('appDropdown');
 
 // ============================================
 // CHAT VIEW ELEMENTS
@@ -79,22 +78,33 @@ document.querySelectorAll('.suggestion-chip').forEach(chip => {
 });
 
 // Quick action button handlers
-criticalBtn.addEventListener('click', function() {
-    const count = document.getElementById('criticalCount').textContent;
-    setPromptAndSend(`Show me the ${count} critical notifications that need my attention.`);
-});
-
 chatsBtn.addEventListener('click', function() {
-    const count = document.getElementById('chatsCount').textContent;
-    setPromptAndSend(`Show me the ${count} updated chats with recent activity.`);
+    // Transition to chat view showing recent chats
+    transitionToChatView();
 });
 
-appointBtn.addEventListener('click', function() {
-    setPromptAndSend('I need to appoint a new director. What is the process and what documents do I need?');
+openAppBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    // Toggle dropdown
+    const isVisible = appDropdown.style.display === 'block';
+    appDropdown.style.display = isVisible ? 'none' : 'block';
 });
 
-openAppBtn.addEventListener('click', function() {
-    setPromptAndSend('I need to open an application. Show me my recent applications or help me start a new one.');
+// App dropdown item handlers
+document.querySelectorAll('.app-dropdown-item').forEach(item => {
+    item.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const appName = this.textContent;
+        appDropdown.style.display = 'none';
+        setPromptAndSend(`Open ${appName}`);
+    });
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (appDropdown && !openAppBtn.contains(e.target) && !appDropdown.contains(e.target)) {
+        appDropdown.style.display = 'none';
+    }
 });
 
 // Helper function to set prompt and send (transitions to chat view)
@@ -126,8 +136,16 @@ function transitionToChatView(initialMessage) {
     chatView.style.display = 'grid';
     currentView = 'chat';
     
-    // Create new chat
-    createNewChat(initialMessage);
+    // If initial message provided, create new chat; otherwise just show chat history
+    if (initialMessage) {
+        createNewChat(initialMessage);
+    } else if (chats.length > 0) {
+        // Load the most recent chat
+        loadChat(chats[0].id);
+    } else {
+        // No chats exist, create a welcome chat
+        createNewChat();
+    }
 }
 
 function transitionToHeroView() {
@@ -147,6 +165,34 @@ function transitionToHeroView() {
 // ============================================
 
 function createNewChat(initialMessage) {
+    if (!initialMessage) {
+        // No initial message, just show empty chat
+        const chatId = 'chat-' + Date.now();
+        currentChatId = chatId;
+        
+        const chat = {
+            id: chatId,
+            title: 'New Chat',
+            messages: [],
+            createdAt: new Date(),
+            preview: 'New conversation',
+            hasUpdate: false,
+            hasWorkflow: false,
+            lastUpdate: null
+        };
+        
+        chats.unshift(chat);
+        
+        // Update UI
+        updateChatHistoryDisplay();
+        updateChatTitle(chat.title);
+        clearChatThread();
+        
+        // Focus the chat input
+        chatInput.focus();
+        return;
+    }
+    
     const chatId = 'chat-' + Date.now();
     currentChatId = chatId;
     
