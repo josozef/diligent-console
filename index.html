@@ -11,75 +11,68 @@
     <div class="container" id="heroView">
         <!-- Welcome Section -->
         <header class="welcome-section">
-            <h1 class="welcome-title">Welcome back, Sara.</h1>
-            <p class="welcome-subtitle">What would you like to do today?</p>
+            <div class="welcome-avatar">
+                <div class="avatar-circle">SH</div>
+                <span class="avatar-status"></span>
+            </div>
+            <div class="welcome-text">
+                <h1 class="welcome-title">Good morning, Sarah.</h1>
+                <p class="welcome-subtitle">Where should we get started today?</p>
+            </div>
         </header>
 
         <!-- Quick Action Buttons -->
         <div class="quick-actions">
-            <button class="action-btn" id="criticalBtn">
-                <div class="action-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                        <line x1="12" y1="9" x2="12" y2="13"></line>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                    <span class="badge" id="criticalCount">3</span>
+            <button class="action-btn action-btn-large" id="chatsBtn">
+                <div class="action-btn-content">
+                    <span class="action-label-large">View recent chats</span>
+                    <span class="action-sublabel">4 updates • 1 running process</span>
                 </div>
-                <span class="action-label">Critical Notifications</span>
             </button>
 
-            <button class="action-btn" id="chatsBtn">
-                <div class="action-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                    </svg>
-                    <span class="badge" id="chatsCount">7</span>
+            <div class="action-btn-wrapper">
+                <button class="action-btn action-btn-large" id="openAppBtn">
+                    <div class="action-btn-content">
+                        <span class="action-label-large">Open application...</span>
+                    </div>
+                </button>
+                <div class="app-dropdown" id="appDropdown" style="display: none;">
+                    <button class="app-dropdown-item" data-app="boards">Boards</button>
+                    <button class="app-dropdown-item" data-app="compliance">Compliance Manager</button>
+                    <button class="app-dropdown-item" data-app="entities">Entities</button>
+                    <button class="app-dropdown-item" data-app="risk">Risk Manager</button>
                 </div>
-                <span class="action-label">Updated Chats</span>
-            </button>
-
-            <button class="action-btn" id="appointBtn">
-                <div class="action-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                    </svg>
-                </div>
-                <span class="action-label">Appoint a Director</span>
-            </button>
-
-            <button class="action-btn" id="openAppBtn">
-                <div class="action-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                    </svg>
-                </div>
-                <span class="action-label">Open Application</span>
-            </button>
+            </div>
         </div>
 
         <!-- AI Prompt Section -->
         <div class="prompt-section">
-            <div class="prompt-container">
-                <textarea 
-                    id="promptInput" 
-                    class="prompt-input" 
-                    placeholder="Ask me anything or describe what you'd like to do..."
-                    rows="1"
-                ></textarea>
-                <button class="send-btn" id="sendBtn">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <textarea 
+                id="promptInput" 
+                class="prompt-input" 
+                placeholder="What should we review?"
+                rows="3"
+            ></textarea>
+            <div class="prompt-controls">
+                <button class="prompt-icon-btn" id="attachBtn" title="Attach file">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                    </svg>
+                </button>
+                <button class="prompt-icon-btn" id="voiceBtn" title="Voice input">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                    </svg>
+                </button>
+                <button class="prompt-icon-btn prompt-send-btn" id="sendBtn" title="Send">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="22" y1="2" x2="11" y2="13"></line>
                         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                     </svg>
                 </button>
-            </div>
-            <div class="prompt-suggestions">
-                <button class="suggestion-chip">Review board documents</button>
-                <button class="suggestion-chip">Schedule meeting</button>
-                <button class="suggestion-chip">Generate compliance report</button>
             </div>
         </div>
 

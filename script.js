@@ -14,6 +14,10 @@ let processPaused = false;
 let currentAppointment = null; // Stores current appointment details
 let processSteps = []; // Stores current workflow steps with statuses
 
+// Panel navigation state
+let currentPanelType = null; // 'appointment', 'process', 'completion', 'document'
+let currentDocumentId = null;
+
 // ============================================
 // HERO VIEW ELEMENTS
 // ============================================
@@ -25,10 +29,9 @@ const responseArea = document.getElementById('responseArea');
 const responseContent = document.getElementById('responseContent');
 
 // Quick action buttons
-const criticalBtn = document.getElementById('criticalBtn');
 const chatsBtn = document.getElementById('chatsBtn');
-const appointBtn = document.getElementById('appointBtn');
 const openAppBtn = document.getElementById('openAppBtn');
+const appDropdown = document.getElementById('appDropdown');
 
 // ============================================
 // CHAT VIEW ELEMENTS
@@ -75,22 +78,33 @@ document.querySelectorAll('.suggestion-chip').forEach(chip => {
 });
 
 // Quick action button handlers
-criticalBtn.addEventListener('click', function() {
-    const count = document.getElementById('criticalCount').textContent;
-    setPromptAndSend(`Show me the ${count} critical notifications that need my attention.`);
-});
-
 chatsBtn.addEventListener('click', function() {
-    const count = document.getElementById('chatsCount').textContent;
-    setPromptAndSend(`Show me the ${count} updated chats with recent activity.`);
+    // Transition to chat view showing recent chats
+    transitionToChatView();
 });
 
-appointBtn.addEventListener('click', function() {
-    setPromptAndSend('I need to appoint a new director. What is the process and what documents do I need?');
+openAppBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    // Toggle dropdown
+    const isVisible = appDropdown.style.display === 'block';
+    appDropdown.style.display = isVisible ? 'none' : 'block';
 });
 
-openAppBtn.addEventListener('click', function() {
-    setPromptAndSend('I need to open an application. Show me my recent applications or help me start a new one.');
+// App dropdown item handlers
+document.querySelectorAll('.app-dropdown-item').forEach(item => {
+    item.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const appName = this.textContent;
+        appDropdown.style.display = 'none';
+        setPromptAndSend(`Open ${appName}`);
+    });
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (appDropdown && !openAppBtn.contains(e.target) && !appDropdown.contains(e.target)) {
+        appDropdown.style.display = 'none';
+    }
 });
 
 // Helper function to set prompt and send (transitions to chat view)
@@ -122,8 +136,16 @@ function transitionToChatView(initialMessage) {
     chatView.style.display = 'grid';
     currentView = 'chat';
     
-    // Create new chat
-    createNewChat(initialMessage);
+    // If initial message provided, create new chat; otherwise just show chat history
+    if (initialMessage) {
+        createNewChat(initialMessage);
+    } else if (chats.length > 0) {
+        // Load the most recent chat
+        loadChat(chats[0].id);
+    } else {
+        // No chats exist, create a welcome chat
+        createNewChat();
+    }
 }
 
 function transitionToHeroView() {
@@ -143,6 +165,34 @@ function transitionToHeroView() {
 // ============================================
 
 function createNewChat(initialMessage) {
+    if (!initialMessage) {
+        // No initial message, just show empty chat
+        const chatId = 'chat-' + Date.now();
+        currentChatId = chatId;
+        
+        const chat = {
+            id: chatId,
+            title: 'New Chat',
+            messages: [],
+            createdAt: new Date(),
+            preview: 'New conversation',
+            hasUpdate: false,
+            hasWorkflow: false,
+            lastUpdate: null
+        };
+        
+        chats.unshift(chat);
+        
+        // Update UI
+        updateChatHistoryDisplay();
+        updateChatTitle(chat.title);
+        clearChatThread();
+        
+        // Focus the chat input
+        chatInput.focus();
+        return;
+    }
+    
     const chatId = 'chat-' + Date.now();
     currentChatId = chatId;
     
@@ -1371,6 +1421,9 @@ function openAppointmentPanel() {
     // Show the right panel
     chatView.classList.add('show-right-panel');
     
+    // Set panel type
+    currentPanelType = 'appointment';
+    
     // Update panel title
     const { isReplacement } = window.selectedAppointment || {};
     document.querySelector('.right-panel-title').textContent = isReplacement ? 'Replace Director' : 'Add Director';
@@ -1544,6 +1597,16 @@ function generateAppointmentPanelContent() {
                     <div class="workflow-step">
                         <div class="workflow-step-number">3</div>
                         <div class="workflow-step-content">
+                            <div class="workflow-step-title">Submit Regulatory Filing</div>
+                            <div class="workflow-step-description">
+                                Prepare and file ${company.location === 'Singapore' ? '<strong>Form 45</strong>' : 'required forms'} with the ${company.location}, ${company.country} regulatory agency.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <div class="workflow-step-number">4</div>
+                        <div class="workflow-step-content">
                             <div class="workflow-step-title">Update Entity Records</div>
                             <div class="workflow-step-description">
                                 Update <strong>Entities</strong> system to reflect ${isReplacement && director ? `${director.name}'s resignation and ` : ''}${appointee.name}'s appointment to the board.
@@ -1568,33 +1631,11 @@ function initializeAppointmentPanel() {
 }
 
 function previewDocument(docId) {
-    if (currentChatId) {
-        const docNames = {
-            'board-resolution': 'Board Resolution',
-            'consent-form': 'Consent to Act as Director',
-            'regulatory-form': 'Regulatory Filing Form'
-        };
-        addMessageToChat(currentChatId, 'assistant', 
-            `Opening preview of ${docNames[docId]}... (Preview functionality would open document viewer here)`
-        );
-    }
+    openDocumentViewer(docId);
 }
 
 function downloadDocument(docId) {
-    if (currentChatId) {
-        const { company, appointee } = window.selectedAppointment || {};
-        const companyShort = company ? company.name.split(',')[0].replace(/[^a-zA-Z0-9]/g, '_') : 'Company';
-        const appointeeShort = appointee ? appointee.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Appointee';
-        
-        const docNames = {
-            'board-resolution': `Board_Resolution_${companyShort}.pdf`,
-            'consent-form': `Consent_to_Act_${appointeeShort}.pdf`,
-            'regulatory-form': `Regulatory_Form_${companyShort}.pdf`
-        };
-        addMessageToChat(currentChatId, 'assistant', 
-            `Downloading ${docNames[docId]}... (Download would start here)`
-        );
-    }
+    downloadDocumentFromViewer(docId);
 }
 
 function closeAppointmentPanel() {
@@ -1651,9 +1692,10 @@ function startAppointmentWorkflow() {
             name: 'Create Board Approval',
             description: 'Submit Board Resolution to the Boards system for asynchronous approval',
             substeps: [
-                { id: 'approval-create', name: 'Create approval request', status: 'completed', time: '2 min ago' },
+                { id: 'approval-create', name: 'Create approval request', status: 'completed', time: 'Jan 7, 9:00 AM' },
                 { id: 'approval-send', name: 'Send to board members', status: 'in_progress', time: null },
-                { id: 'approval-return', name: 'Await approval responses', status: 'pending', time: null }
+                { id: 'approval-return', name: 'Await approval responses', status: 'pending', time: null },
+                { id: 'approval-store', name: 'Store signed Board Resolution', status: 'pending', time: null, docLink: 'board-resolution-signed' }
             ]
         },
         {
@@ -1664,7 +1706,19 @@ function startAppointmentWorkflow() {
                 { id: 'forms-create', name: 'Generate regulatory forms', status: 'pending', time: null },
                 { id: 'forms-send', name: `Email forms to ${appointee.name}`, status: 'pending', time: null },
                 { id: 'forms-receive', name: 'Receive signed documents', status: 'pending', time: null },
-                { id: 'forms-validate', name: 'Validate form completeness', status: 'pending', time: null }
+                { id: 'forms-validate', name: 'Validate form completeness', status: 'pending', time: null },
+                { id: 'forms-store', name: 'Store Consent to Act form', status: 'pending', time: null, docLink: 'consent-form-signed' }
+            ]
+        },
+        {
+            id: 'regulatory-filing',
+            name: 'Submit Regulatory Filing',
+            description: `File ${company.location === 'Singapore' ? 'Form 45' : 'required forms'} with regulatory agency`,
+            substeps: [
+                { id: 'filing-prepare', name: `Prepare ${company.location === 'Singapore' ? 'Form 45' : 'regulatory filing'}`, status: 'pending', time: null },
+                { id: 'filing-submit', name: 'Submit to regulatory agency', status: 'pending', time: null },
+                { id: 'filing-confirm', name: 'Receive filing confirmation', status: 'pending', time: null },
+                { id: 'filing-store', name: 'Store filed documents', status: 'pending', time: null, docLink: 'regulatory-filing' }
             ]
         },
         {
@@ -1707,6 +1761,9 @@ function startAppointmentWorkflow() {
 function openInProgressPanel() {
     // Show the right panel
     chatView.classList.add('show-right-panel');
+    
+    // Set panel type
+    currentPanelType = processRunning ? 'process' : 'completion';
     
     // Update panel title
     document.querySelector('.right-panel-title').textContent = 'Process Status';
@@ -1827,7 +1884,13 @@ function generateStepHTML(step, stepIdx) {
                             ${substep.status === 'in_progress' 
                                 ? '<div class="substep-meta">In progress...</div>'
                                 : substep.time 
-                                    ? `<div class="substep-meta">Completed ${substep.time}</div>`
+                                    ? `<div class="substep-meta">
+                                        Completed ${substep.time}
+                                        ${substep.docLink && substep.status === 'completed' 
+                                            ? ` • <a href="#" onclick="event.preventDefault(); openDocumentFromWorkflow('${substep.docLink}');" style="color: var(--color-gray-900); font-weight: 500; text-decoration: underline;">Open document</a>`
+                                            : ''
+                                        }
+                                       </div>`
                                     : ''
                             }
                         </div>
@@ -1841,12 +1904,12 @@ function generateStepHTML(step, stepIdx) {
 function getStatusIcon(status) {
     switch(status) {
         case 'completed':
-            return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+            return '<div class="status-dot status-dot-completed"></div>';
         case 'in_progress':
-            return '<div class="spinner-small"></div>';
+            return '<div class="status-dot status-dot-in-progress"></div>';
         case 'pending':
         default:
-            return '<div class="pending-dot"></div>';
+            return '<div class="status-dot status-dot-pending"></div>';
     }
 }
 
@@ -1904,21 +1967,75 @@ function reopenStatusPanel() {
 function simulateLiveUpdates() {
     if (!processRunning || processPaused) return;
     
+    // Timeline spanning 5 business days (Jan 7-13, 2025, skipping weekend)
+    const timeline = {
+        // Business Day 1: Tuesday, Jan 7 - Board Approval starts
+        'approval-send': 'Jan 7, 9:15 AM',
+        'approval-return': 'Jan 8, 4:30 PM',
+        'approval-store': 'Jan 8, 4:45 PM',
+        
+        // Business Day 3: Thursday, Jan 9 - Forms preparation and sending
+        'forms-create': 'Jan 9, 10:00 AM',
+        'forms-send': 'Jan 9, 10:30 AM',
+        'forms-receive': 'Jan 10, 2:15 PM',
+        'forms-validate': 'Jan 10, 2:30 PM',
+        'forms-store': 'Jan 10, 2:45 PM',
+        
+        // Business Day 4: Friday, Jan 10 - Regulatory filing
+        'filing-prepare': 'Jan 10, 3:00 PM',
+        'filing-submit': 'Jan 10, 4:00 PM',
+        'filing-confirm': 'Jan 13, 11:00 AM',
+        'filing-store': 'Jan 13, 11:15 AM',
+        
+        // Business Day 5: Monday, Jan 13 - Entity updates
+        'entity-resign': 'Jan 13, 2:00 PM',
+        'entity-appoint': 'Jan 13, 2:15 PM'
+    };
+    
+    // Build updates dynamically based on actual process steps
+    const updates = [];
+    let currentDelay = 2000;
+    
+    processSteps.forEach(step => {
+        step.substeps.forEach(substep => {
+            // Skip if already completed
+            if (substep.status === 'completed') return;
+            
+            // Add in_progress update
+            if (substep.status !== 'in_progress') {
+                updates.push({
+                    stepId: step.id,
+                    substepId: substep.id,
+                    status: 'in_progress',
+                    time: null,
+                    delay: currentDelay
+                });
+                currentDelay = Math.floor(Math.random() * 2000) + 1500; // 1.5-3.5s
+            }
+            
+            // Add completed update with realistic timestamp
+            updates.push({
+                stepId: step.id,
+                substepId: substep.id,
+                status: 'completed',
+                time: timeline[substep.id] || 'Completed',
+                delay: currentDelay
+            });
+            currentDelay = Math.floor(Math.random() * 2000) + 2000; // 2-4s
+        });
+    });
+    
     // Simulate progress through substeps
     let updateIndex = 0;
-    const updates = [
-        { stepId: 'board-approval', substepId: 'approval-send', status: 'completed', time: '1 min ago', delay: 2000 },
-        { stepId: 'board-approval', substepId: 'approval-return', status: 'in_progress', time: null, delay: 3000 },
-        { stepId: 'board-approval', substepId: 'approval-return', status: 'completed', time: 'Just now', delay: 5000 },
-        { stepId: 'regulatory-forms', substepId: 'forms-create', status: 'in_progress', time: null, delay: 2000 },
-        { stepId: 'regulatory-forms', substepId: 'forms-create', status: 'completed', time: 'Just now', delay: 3000 },
-        { stepId: 'regulatory-forms', substepId: 'forms-send', status: 'in_progress', time: null, delay: 2000 },
-        { stepId: 'regulatory-forms', substepId: 'forms-send', status: 'completed', time: 'Just now', delay: 4000 },
-        { stepId: 'regulatory-forms', substepId: 'forms-receive', status: 'in_progress', time: null, delay: 1000 }
-    ];
     
     function applyUpdate() {
-        if (!processRunning || processPaused || updateIndex >= updates.length) return;
+        if (!processRunning || processPaused || updateIndex >= updates.length) {
+            // Check if all steps are complete
+            if (updateIndex >= updates.length && processRunning) {
+                completeWorkflow();
+            }
+            return;
+        }
         
         const update = updates[updateIndex];
         
@@ -1942,11 +2059,306 @@ function simulateLiveUpdates() {
         
         if (updateIndex < updates.length) {
             setTimeout(applyUpdate, updates[updateIndex].delay);
+        } else {
+            // All updates complete
+            setTimeout(() => completeWorkflow(), 1000);
         }
     }
     
     // Start the first update
     setTimeout(applyUpdate, updates[0].delay);
+}
+
+function completeWorkflow() {
+    if (!processRunning) return;
+    
+    processRunning = false;
+    
+    // Remove workflow indicator from current chat
+    const chat = chats.find(c => c.id === currentChatId);
+    if (chat) {
+        chat.hasWorkflow = false;
+        chat.hasUpdate = true;
+    }
+    
+    // Update history display
+    updateChatHistoryDisplay();
+    
+    // Show completion panel
+    if (chatView.classList.contains('show-right-panel')) {
+        currentPanelType = 'completion';
+        const panelContent = document.querySelector('.right-panel-content');
+        panelContent.innerHTML = generateCompletionPanel();
+    }
+    
+    // Send completion message to chat
+    if (currentChatId) {
+        const { company, appointee } = window.selectedAppointment || {};
+        addMessageToChat(currentChatId, 'assistant', 
+            `<div style="padding: var(--space-4); background: var(--color-gray-50); border-left: 3px solid var(--color-gray-800); border-radius: var(--radius-md);">
+                <h4 style="color: var(--color-gray-900); margin-bottom: var(--space-2);">✓ Appointment Process Complete</h4>
+                <p style="color: var(--color-gray-700); margin-bottom: var(--space-2);">
+                    The appointment of <strong>${appointee ? appointee.name : 'the appointee'}</strong> to <strong>${company ? company.name : 'the company'}</strong> has been successfully completed.
+                </p>
+                <p style="color: var(--color-gray-600); font-size: var(--text-sm);">
+                    All documents have been filed and stored in the document repository. Entity records have been updated.
+                </p>
+                <button class="preview-panel-btn" onclick="reopenStatusPanel()" style="margin-top: var(--space-3);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    View Summary
+                </button>
+            </div>`
+        );
+    }
+}
+
+function generateCompletionPanel() {
+    const { company, appointee } = window.selectedAppointment || {};
+    
+    return `
+        <div class="in-progress-panel">
+            <!-- Header with Status -->
+            <section class="panel-section">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3);">
+                    <div>
+                        <h4 class="panel-section-title" style="margin-bottom: var(--space-1);">Director Appointment</h4>
+                        <span class="status-badge status-completed">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            Completed
+                        </span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Context Summary -->
+            <section class="panel-section">
+                <h4 class="panel-section-title">Appointment Details</h4>
+                
+                <div class="summary-card-compact">
+                    <div class="summary-item-compact">
+                        <label class="summary-label">Company</label>
+                        <div class="summary-value">${currentAppointment.company}</div>
+                    </div>
+                    
+                    ${currentAppointment.resigningDirector ? `
+                    <div class="summary-item-compact">
+                        <label class="summary-label">Resigning Director</label>
+                        <div class="summary-value">${currentAppointment.resigningDirector}</div>
+                    </div>
+                    ` : ''}
+                    
+                    <div class="summary-item-compact">
+                        <label class="summary-label">${currentAppointment.isReplacement ? 'Appointee' : 'New Director'}</label>
+                        <div class="summary-value">${currentAppointment.appointee}</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Workflow Progress -->
+            <section class="panel-section" style="flex: 1; overflow-y: auto;">
+                <h4 class="panel-section-title">Completed Steps</h4>
+                
+                <div class="process-steps">
+                    ${processSteps.map((step, stepIdx) => generateStepHTML(step, stepIdx)).join('')}
+                </div>
+            </section>
+
+            <!-- Actions -->
+            <section class="panel-section panel-actions">
+                <button class="panel-btn-secondary" onclick="chatView.classList.remove('show-right-panel')">Close</button>
+            </section>
+        </div>
+    `;
+}
+
+function openDocumentFromWorkflow(docId) {
+    openDocumentViewer(docId);
+}
+
+function openDocumentViewer(docId) {
+    // Store previous panel type for back navigation
+    const previousPanelType = currentPanelType;
+    currentPanelType = 'document';
+    currentDocumentId = docId;
+    
+    // Update panel title
+    document.querySelector('.right-panel-title').textContent = 'Document Viewer';
+    
+    // Populate the panel content
+    const panelContent = document.querySelector('.right-panel-content');
+    panelContent.innerHTML = generateDocumentViewerPanel(docId, previousPanelType);
+}
+
+function generateDocumentViewerPanel(docId, previousPanelType) {
+    const { company, appointee } = window.selectedAppointment || {};
+    const companyShort = company ? company.name.split(',')[0].replace(/[^a-zA-Z0-9]/g, '_') : 'Company';
+    const appointeeShort = appointee ? appointee.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Appointee';
+    
+    // Map document IDs to display info
+    const docInfo = {
+        'board-resolution': {
+            name: 'Board Resolution',
+            filename: `Board_Resolution_${companyShort}.pdf`,
+            description: 'Draft board resolution for director appointment',
+            type: 'Draft'
+        },
+        'board-resolution-signed': {
+            name: 'Board Resolution (Signed)',
+            filename: `Board_Resolution_Signed_${companyShort}.pdf`,
+            description: 'Signed and approved board resolution',
+            type: 'Final'
+        },
+        'consent-form': {
+            name: 'Consent to Act as Director',
+            filename: `Consent_to_Act_${appointeeShort}.pdf`,
+            description: 'Consent form for appointee signature',
+            type: 'Draft'
+        },
+        'consent-form-signed': {
+            name: 'Consent to Act as Director (Signed)',
+            filename: `Consent_to_Act_Signed_${appointeeShort}.pdf`,
+            description: 'Signed consent to act form',
+            type: 'Final'
+        },
+        'regulatory-form': {
+            name: company && company.location === 'Singapore' ? 'Form 45' : 'Regulatory Filing Form',
+            filename: company && company.location === 'Singapore' 
+                ? `Form_45_${companyShort}.pdf` 
+                : `Regulatory_Filing_${companyShort}.pdf`,
+            description: company && company.location === 'Singapore'
+                ? 'Form 45 - Notification of Change of Director'
+                : 'Regulatory filing for director change',
+            type: 'Draft'
+        },
+        'regulatory-filing': {
+            name: company && company.location === 'Singapore' ? 'Form 45 (Filed)' : 'Regulatory Filing (Filed)',
+            filename: company && company.location === 'Singapore' 
+                ? `Form_45_Filed_${companyShort}.pdf` 
+                : `Regulatory_Filing_${companyShort}.pdf`,
+            description: company && company.location === 'Singapore'
+                ? 'Filed Form 45 with confirmation'
+                : 'Filed regulatory documents with confirmation',
+            type: 'Filed'
+        }
+    };
+    
+    const doc = docInfo[docId] || {
+        name: 'Document',
+        filename: 'document.pdf',
+        description: 'Document preview',
+        type: 'Document'
+    };
+    
+    return `
+        <div class="document-viewer-panel">
+            <!-- Document Header -->
+            <section class="panel-section">
+                <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4);">
+                    <button class="panel-btn-tertiary" onclick="navigateBackFromDocument('${previousPanelType}')" style="padding: var(--space-2); flex-shrink: 0;" title="Back">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                    </button>
+                    <div style="flex: auto; min-width: 0;">
+                        <h4 style="font-size: var(--text-xl); font-weight: 600; color: var(--color-gray-900); margin: 0 0 var(--space-1) 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${doc.name}</h4>
+                        <div style="font-size: var(--text-sm); color: var(--color-gray-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${doc.description}</div>
+                    </div>
+                    <button class="panel-btn-secondary" onclick="downloadDocumentFromViewer('${docId}')" style="padding: 0; width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;" title="Download">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div style="display: flex; gap: var(--space-2); margin-bottom: var(--space-4);">
+                    <span style="display: inline-flex; align-items: center; padding: var(--space-1) var(--space-3); background: var(--color-gray-100); border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--color-gray-700);">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        ${doc.type}
+                    </span>
+                    <span style="display: inline-flex; align-items: center; padding: var(--space-1) var(--space-3); background: var(--color-gray-100); border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--color-gray-700);">
+                        ${doc.filename}
+                    </span>
+                </div>
+            </section>
+
+            <!-- Document Preview -->
+            <section class="panel-section" style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+                <div class="document-preview-container">
+                    <div class="document-preview-placeholder">
+                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--color-gray-400);">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                        <h4 style="margin-top: var(--space-4); color: var(--color-gray-700); font-size: var(--text-lg); font-weight: 600;">
+                            ${doc.name}
+                        </h4>
+                        <p style="margin-top: var(--space-2); color: var(--color-gray-600); font-size: var(--text-sm);">
+                            PDF document preview
+                        </p>
+                        <p style="margin-top: var(--space-1); color: var(--color-gray-500); font-size: var(--text-xs);">
+                            ${doc.filename}
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    `;
+}
+
+function navigateBackFromDocument(previousPanelType) {
+    // Navigate back to the previous panel
+    if (previousPanelType === 'appointment') {
+        openAppointmentPanel();
+    } else if (previousPanelType === 'process') {
+        openInProgressPanel();
+    } else if (previousPanelType === 'completion') {
+        currentPanelType = 'completion';
+        document.querySelector('.right-panel-title').textContent = 'Process Status';
+        const panelContent = document.querySelector('.right-panel-content');
+        panelContent.innerHTML = generateCompletionPanel();
+    } else {
+        // Default: close panel
+        chatView.classList.remove('show-right-panel');
+    }
+}
+
+function downloadDocumentFromViewer(docId) {
+    const { company, appointee } = window.selectedAppointment || {};
+    const companyShort = company ? company.name.split(',')[0].replace(/[^a-zA-Z0-9]/g, '_') : 'Company';
+    const appointeeShort = appointee ? appointee.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Appointee';
+    
+    const docNames = {
+        'board-resolution': `Board_Resolution_${companyShort}.pdf`,
+        'board-resolution-signed': `Board_Resolution_Signed_${companyShort}.pdf`,
+        'consent-form': `Consent_to_Act_${appointeeShort}.pdf`,
+        'consent-form-signed': `Consent_to_Act_Signed_${appointeeShort}.pdf`,
+        'regulatory-form': company && company.location === 'Singapore' 
+            ? `Form_45_${companyShort}.pdf` 
+            : `Regulatory_Filing_${companyShort}.pdf`,
+        'regulatory-filing': company && company.location === 'Singapore' 
+            ? `Form_45_Filed_${companyShort}.pdf` 
+            : `Regulatory_Filing_${companyShort}.pdf`
+    };
+    
+    if (currentChatId) {
+        addMessageToChat(currentChatId, 'assistant', 
+            `Downloading ${docNames[docId]}...`
+        );
+    }
 }
 
 // ============================================
