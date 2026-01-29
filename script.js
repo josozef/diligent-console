@@ -28,11 +28,11 @@ const sendBtn = document.getElementById('sendBtn');
 const responseArea = document.getElementById('responseArea');
 const responseContent = document.getElementById('responseContent');
 
-// Quick action buttons
-const chatsBtn = document.getElementById('chatsBtn');
-const appointBtn = document.getElementById('appointBtn');
-const openAppBtn = document.getElementById('openAppBtn');
-const appDropdown = document.getElementById('appDropdown');
+// Quick action buttons (TEMPORARILY HIDDEN)
+// const chatsBtn = document.getElementById('chatsBtn');
+// const appointBtn = document.getElementById('appointBtn');
+// const openAppBtn = document.getElementById('openAppBtn');
+// const appDropdown = document.getElementById('appDropdown');
 
 // Navigation rail buttons
 const navHome = document.getElementById('navHome');
@@ -41,14 +41,13 @@ const navConsole = document.getElementById('navConsole');
 // Top header
 const topHeader = document.getElementById('topHeader');
 
-// App Tiles
-const showAllAppsBtn = document.getElementById('showAllAppsBtn');
-const allAppsContainer = document.getElementById('allAppsContainer');
-
 // What Can I Do
 const whatCanIDoBtn = document.getElementById('whatCanIDoBtn');
 const assistCapabilities = document.getElementById('assistCapabilities');
 const closeCapabilitiesBtn = document.getElementById('closeCapabilitiesBtn');
+
+// View All Chats Link
+const viewAllChatsLink = document.getElementById('viewAllChatsLink');
 
 // ============================================
 // CHAT VIEW ELEMENTS
@@ -94,7 +93,8 @@ document.querySelectorAll('.suggestion-chip').forEach(chip => {
     });
 });
 
-// Quick action button handlers
+// Quick action button handlers (TEMPORARILY HIDDEN)
+/*
 chatsBtn.addEventListener('click', function() {
     // Transition to chat view showing recent chats
     transitionToChatView();
@@ -127,20 +127,7 @@ document.addEventListener('click', function(e) {
         appDropdown.style.display = 'none';
     }
 });
-
-// Show All Apps toggle
-showAllAppsBtn.addEventListener('click', function() {
-    const isExpanded = allAppsContainer.style.display === 'block';
-    if (isExpanded) {
-        allAppsContainer.style.display = 'none';
-        showAllAppsBtn.classList.remove('expanded');
-        showAllAppsBtn.querySelector('span').textContent = 'Show All Apps';
-    } else {
-        allAppsContainer.style.display = 'block';
-        showAllAppsBtn.classList.add('expanded');
-        showAllAppsBtn.querySelector('span').textContent = 'Hide All Apps';
-    }
-});
+*/
 
 // What Can I Do toggle
 whatCanIDoBtn.addEventListener('click', function(e) {
@@ -150,16 +137,18 @@ whatCanIDoBtn.addEventListener('click', function(e) {
         assistCapabilities.style.display = 'none';
     } else {
         assistCapabilities.style.display = 'block';
-        // Hide "Show All Apps" section when showing capabilities
-        allAppsContainer.style.display = 'none';
-        showAllAppsBtn.classList.remove('expanded');
-        showAllAppsBtn.querySelector('span').textContent = 'Show All Apps';
     }
 });
 
 // Close capabilities button
 closeCapabilitiesBtn.addEventListener('click', function() {
     assistCapabilities.style.display = 'none';
+});
+
+// View All Chats link
+viewAllChatsLink.addEventListener('click', function(e) {
+    e.preventDefault();
+    transitionToChatView();
 });
 
 // Capability Try button
@@ -274,6 +263,7 @@ function createNewChat(initialMessage) {
             preview: 'New conversation',
             hasUpdate: false,
             hasWorkflow: false,
+            workflowType: null,
             lastUpdate: null
         };
         
@@ -300,6 +290,7 @@ function createNewChat(initialMessage) {
         preview: initialMessage.substring(0, 60),
         hasUpdate: false,
         hasWorkflow: false,
+        workflowType: null,
         lastUpdate: null
     };
     
@@ -327,28 +318,40 @@ function initializeMockChats() {
     const mockChats = [
         {
             id: 'mock-1',
-            title: 'Board Meeting Q1 2026 - Agenda Review',
-            preview: 'Can you help me prepare the agenda for our Q1 board meeting?',
+            title: 'Director Appointment - Wei Chen',
+            preview: 'Replace director David Chen at Pacific Polymer Logistics',
             createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000), // 2 days ago
             lastUpdate: new Date(now - 3 * 60 * 60 * 1000), // 3 hours ago
             hasUpdate: true,
-            hasWorkflow: false,
+            hasWorkflow: true,
+            workflowType: 'Director Appointment',
             messages: []
         },
         {
             id: 'mock-2',
-            title: 'Compliance Audit Preparation',
-            preview: 'I need to prepare documentation for our upcoming compliance audit...',
-            createdAt: new Date(now - 5 * 24 * 60 * 60 * 1000), // 5 days ago
-            lastUpdate: new Date(now - 1 * 60 * 60 * 1000), // 1 hour ago
-            hasUpdate: true,
+            title: 'Board Resolution Review',
+            preview: 'Review the draft resolution for the Q1 strategic initiative',
+            createdAt: new Date(now - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+            lastUpdate: null,
+            hasUpdate: false,
             hasWorkflow: false,
             messages: []
         },
         {
             id: 'mock-3',
-            title: 'Annual Report Draft Review',
-            preview: 'Please review the financial disclosures in the annual report draft',
+            title: 'Entity Formation - Delaware LLC',
+            preview: 'Set up a new Delaware LLC for our real estate holdings',
+            createdAt: new Date(now - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+            lastUpdate: new Date(now - 1 * 60 * 60 * 1000), // 1 hour ago
+            hasUpdate: true,
+            hasWorkflow: true,
+            workflowType: 'Entity Formation',
+            messages: []
+        },
+        {
+            id: 'mock-4',
+            title: 'Corporate Governance Best Practices',
+            preview: 'What are the latest ESG reporting requirements for public companies?',
             createdAt: new Date(now - 7 * 24 * 60 * 60 * 1000), // 7 days ago
             lastUpdate: null,
             hasUpdate: false,
@@ -356,30 +359,21 @@ function initializeMockChats() {
             messages: []
         },
         {
-            id: 'mock-4',
-            title: 'Executive Compensation Committee Meeting',
-            preview: 'Prepare materials for the executive compensation discussion',
+            id: 'mock-5',
+            title: 'Annual Compliance Filing - Singapore',
+            preview: 'File annual return and financial statements for Pacific Polymer',
             createdAt: new Date(now - 10 * 24 * 60 * 60 * 1000), // 10 days ago
             lastUpdate: null,
             hasUpdate: false,
             hasWorkflow: false,
-            messages: []
-        },
-        {
-            id: 'mock-5',
-            title: 'Subsidiary Incorporation - Singapore',
-            preview: 'Walk me through the process of incorporating a subsidiary in Singapore',
-            createdAt: new Date(now - 14 * 24 * 60 * 60 * 1000), // 14 days ago
-            lastUpdate: null,
-            hasUpdate: false,
-            hasWorkflow: false,
+            workflowType: 'Compliance Filing',
             messages: []
         },
         {
             id: 'mock-6',
-            title: 'Risk Assessment Framework Update',
-            preview: 'Update our enterprise risk assessment framework based on new regulations',
-            createdAt: new Date(now - 18 * 24 * 60 * 60 * 1000), // 18 days ago
+            title: 'Board Meeting Preparation',
+            preview: 'Help me prepare materials for next week\'s board meeting',
+            createdAt: new Date(now - 12 * 24 * 60 * 60 * 1000), // 12 days ago
             lastUpdate: null,
             hasUpdate: false,
             hasWorkflow: false,
@@ -387,19 +381,20 @@ function initializeMockChats() {
         },
         {
             id: 'mock-7',
-            title: 'Board Resolution - Share Buyback',
-            preview: 'Draft a board resolution approving the share buyback program',
-            createdAt: new Date(now - 21 * 24 * 60 * 60 * 1000), // 21 days ago
+            title: 'Officer Appointment - CFO',
+            preview: 'Appoint Sarah Martinez as Chief Financial Officer',
+            createdAt: new Date(now - 15 * 24 * 60 * 60 * 1000), // 15 days ago
             lastUpdate: null,
             hasUpdate: false,
             hasWorkflow: false,
+            workflowType: 'Officer Appointment',
             messages: []
         },
         {
             id: 'mock-8',
-            title: 'Conflict of Interest Policy Review',
-            preview: 'Review and update our conflict of interest policy for directors',
-            createdAt: new Date(now - 25 * 24 * 60 * 60 * 1000), // 25 days ago
+            title: 'Fiduciary Duties Research',
+            preview: 'Explain the fiduciary duties of directors under Delaware law',
+            createdAt: new Date(now - 18 * 24 * 60 * 60 * 1000), // 18 days ago
             lastUpdate: null,
             hasUpdate: false,
             hasWorkflow: false,
@@ -407,19 +402,41 @@ function initializeMockChats() {
         },
         {
             id: 'mock-9',
-            title: 'Quarterly Board Book Preparation',
-            preview: 'Help me compile and organize the Q4 board book materials',
-            createdAt: new Date(now - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+            title: 'Board Resolution - M&A Transaction',
+            preview: 'Draft board resolution approving the acquisition of TechCorp',
+            createdAt: new Date(now - 21 * 24 * 60 * 60 * 1000), // 21 days ago
+            lastUpdate: null,
+            hasUpdate: false,
+            hasWorkflow: false,
+            workflowType: 'Board Resolution',
+            messages: []
+        },
+        {
+            id: 'mock-10',
+            title: 'Insider Trading Policy Update',
+            preview: 'Review our insider trading policy for compliance with new SEC rules',
+            createdAt: new Date(now - 24 * 24 * 60 * 60 * 1000), // 24 days ago
             lastUpdate: null,
             hasUpdate: false,
             hasWorkflow: false,
             messages: []
         },
         {
-            id: 'mock-10',
-            title: 'Director Independence Assessment',
-            preview: 'Assess the independence status of our current board members',
-            createdAt: new Date(now - 35 * 24 * 60 * 60 * 1000), // 35 days ago
+            id: 'mock-11',
+            title: 'Share Transfer - Private Sale',
+            preview: 'Process share transfer between John Smith and ABC Holdings',
+            createdAt: new Date(now - 27 * 24 * 60 * 60 * 1000), // 27 days ago
+            lastUpdate: null,
+            hasUpdate: false,
+            hasWorkflow: false,
+            workflowType: 'Share Transfer',
+            messages: []
+        },
+        {
+            id: 'mock-12',
+            title: 'D&O Insurance Research',
+            preview: 'Compare D&O insurance options for our board coverage',
+            createdAt: new Date(now - 30 * 24 * 60 * 60 * 1000), // 30 days ago
             lastUpdate: null,
             hasUpdate: false,
             hasWorkflow: false,
@@ -541,11 +558,28 @@ function updateChatHistoryDisplay() {
         const item = document.createElement('div');
         item.className = `chat-history-item ${chat.id === currentChatId ? 'active' : ''}`;
         
-        // Build badges HTML
+        // Build badges and tags HTML
         let badgesHTML = '';
+        let workflowTagHTML = '';
+        
+        // Show workflow tag for any chat with a workflow type
+        if (chat.workflowType) {
+            workflowTagHTML = `<span class="workflow-type-tag">${chat.workflowType}</span>`;
+        }
+        
+        // Show appropriate badge
         if (chat.hasWorkflow) {
+            // In-progress workflow - pulsing dot
             badgesHTML = '<span class="chat-badge workflow-badge"><span class="workflow-pulse"></span></span>';
+        } else if (chat.workflowType) {
+            // Completed workflow - checkmark
+            badgesHTML = `<span class="chat-badge completed-badge">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </span>`;
         } else if (chat.hasUpdate) {
+            // Regular update - static dot
             badgesHTML = '<span class="chat-badge update-badge"></span>';
         }
         
@@ -554,6 +588,7 @@ function updateChatHistoryDisplay() {
                 <div class="chat-history-title">${chat.title}</div>
                 ${badgesHTML}
             </div>
+            ${workflowTagHTML}
             <div class="chat-history-preview">${chat.preview}</div>
             <div class="chat-history-time">${formatTime(chat.lastUpdate || chat.createdAt)}</div>
         `;
