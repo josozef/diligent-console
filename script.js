@@ -62,6 +62,7 @@ const chatThread = document.getElementById('chatThread');
 const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
 const chatTitle = document.getElementById('chatTitle');
+const chatBackBtn = document.getElementById('chatBackBtn');
 const backToHeroBtn = document.getElementById('backToHeroBtn');
 // const newChatBtn = document.getElementById('newChatBtn'); // Removed - sidebar no longer exists
 const rightPanel = document.getElementById('rightPanel');
@@ -704,6 +705,13 @@ if (chatInput) {
 // Chat send button
 if (chatSendBtn) {
     chatSendBtn.addEventListener('click', sendChatMessage);
+}
+
+// Chat back button
+if (chatBackBtn) {
+    chatBackBtn.addEventListener('click', function() {
+        transitionToHeroView();
+    });
 }
 
 // ============================================
@@ -1647,8 +1655,7 @@ function openAppointmentPanel() {
     currentPanelType = 'appointment';
     
     // Update panel title
-    const { isReplacement } = window.selectedAppointment || {};
-    document.querySelector('.right-panel-title').textContent = isReplacement ? 'Replace Director' : 'Add Director';
+    document.querySelector('.right-panel-title').textContent = 'Preview Workflow';
     
     // Populate the panel content
     const panelContent = document.querySelector('.right-panel-content');
@@ -1721,8 +1728,7 @@ function reopenPreviewPanel() {
     // If we're not already showing the appointment panel, regenerate it
     if (currentPanelType !== 'appointment') {
         currentPanelType = 'appointment';
-        const { isReplacement } = window.selectedAppointment || {};
-        document.querySelector('.right-panel-title').textContent = isReplacement ? 'Replace Director' : 'Add Director';
+        document.querySelector('.right-panel-title').textContent = 'Preview Workflow';
         const panelContent = document.querySelector('.right-panel-content');
         panelContent.innerHTML = generateAppointmentPanelContent();
     }

@@ -305,7 +305,15 @@
         <!-- Main Panel: Current Conversation -->
         <main class="chat-main" id="chatMain">
             <div class="chat-header">
-                <h2 class="chat-title" id="chatTitle">New Conversation</h2>
+                <div class="chat-header-left">
+                    <button class="chat-back-btn" id="chatBackBtn" title="Back to Command Center">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                    </button>
+                    <h2 class="chat-title" id="chatTitle">New Conversation</h2>
+                </div>
                 <div class="chat-header-actions" id="chatHeaderActions" style="display: none;">
                     <!-- Dynamic content: Preview button, View Status button, etc. -->
                 </div>
