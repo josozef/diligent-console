@@ -543,13 +543,31 @@ function appendMessageToThread(message) {
     
     // Initialize form if present
     if (message.content.includes('appointDirectorForm')) {
-        setTimeout(() => initializeAppointDirectorForm(), 100);
+        setTimeout(() => {
+            initializeAppointDirectorForm();
+            // Scroll after form initialization
+            setTimeout(() => {
+                chatThread.scrollTop = chatThread.scrollHeight;
+            }, 50);
+        }, 100);
     }
     if (message.content.includes('addPersonForm')) {
-        setTimeout(() => initializeAddPersonForm(), 100);
+        setTimeout(() => {
+            initializeAddPersonForm();
+            // Scroll after form initialization
+            setTimeout(() => {
+                chatThread.scrollTop = chatThread.scrollHeight;
+            }, 50);
+        }, 100);
     }
     if (message.content.includes('replacementAppointeeSearchField')) {
-        setTimeout(() => initializeReplacementAppointeeSearch(), 100);
+        setTimeout(() => {
+            initializeReplacementAppointeeSearch();
+            // Scroll after form initialization
+            setTimeout(() => {
+                chatThread.scrollTop = chatThread.scrollHeight;
+            }, 50);
+        }, 100);
     }
     
     // Scroll to bottom
@@ -977,112 +995,292 @@ function selectAppointmentType(type) {
     }, 400);
 }
 
-function showAddPersonForm(appointmentType) {
+// Global variable to store multi-step form data
+window.addPersonFormData = {};
+
+function showAddPersonForm(appointmentType, step = 1) {
     if (!currentChatId) return;
     
-    // Store current form state before switching to add person form
-    const companyId = document.getElementById('selectedCompanyId')?.value || '';
-    const directorId = document.getElementById('selectedDirectorId')?.value || '';
-    
-    window.tempAppointmentFormState = {
-        appointmentType: appointmentType,
-        companyId: companyId,
-        directorId: directorId
-    };
-    
-    // Add user message
-    addMessageToChat(currentChatId, 'user', 'I need to add a new appointee');
+    // Store current form state before switching to add person form (only on first step)
+    if (step === 1) {
+        const companyId = document.getElementById('selectedCompanyId')?.value || '';
+        let directorId = document.getElementById('selectedDirectorId')?.value || '';
+        
+        // If no director ID found in form, check if there's a selected director from text-based workflow
+        if (!directorId && window.selectedDisambiguatedDirector) {
+            directorId = window.selectedDisambiguatedDirector.id;
+        }
+        
+        window.tempAppointmentFormState = {
+            appointmentType: appointmentType,
+            companyId: companyId,
+            directorId: directorId
+        };
+        
+        // Reset form data
+        window.addPersonFormData = {};
+        
+        // Add user message
+        addMessageToChat(currentChatId, 'user', 'I need to add a new appointee');
+    }
     
     // Show add person form
     setTimeout(() => {
-        const response = generateAddPersonForm();
+        const response = generateAddPersonForm(step, window.addPersonFormData);
         addMessageToChat(currentChatId, 'assistant', response);
     }, 400);
 }
 
-function generateAddPersonForm() {
-    return `
-        <h3 style="margin-bottom: var(--space-3); color: var(--color-gray-900);">Add New Person to Entities</h3>
-        <p style="margin-bottom: var(--space-5); line-height: var(--leading-normal); color: var(--color-gray-700);">
-            This person will be added to the Entities system and available for future appointments.
-        </p>
-        
-        <form id="addPersonForm" class="hybrid-form">
-            <!-- First Name -->
-            <div class="form-field">
-                <label class="form-label">First Name <span style="color: #dc2626;">*</span></label>
-                <input 
-                    type="text" 
-                    id="personFirstName" 
-                    class="search-input"
-                    placeholder="Enter first name..."
-                    autocomplete="off"
-                    required
-                />
-            </div>
-
-            <!-- Last Name -->
-            <div class="form-field">
-                <label class="form-label">Last Name <span style="color: #dc2626;">*</span></label>
-                <input 
-                    type="text" 
-                    id="personLastName" 
-                    class="search-input"
-                    placeholder="Enter last name..."
-                    autocomplete="off"
-                    required
-                />
-            </div>
-
-            <!-- Title -->
-            <div class="form-field">
-                <label class="form-label">Title <span style="color: #dc2626;">*</span></label>
-                <input 
-                    type="text" 
-                    id="personTitle" 
-                    class="search-input"
-                    placeholder="e.g., Chief Financial Officer"
-                    autocomplete="off"
-                    required
-                />
-            </div>
-
-            <!-- Company -->
-            <div class="form-field">
-                <label class="form-label">Company <span style="color: #dc2626;">*</span></label>
-                <div class="search-field-wrapper">
+function generateAddPersonForm(step = 1, formData = {}) {
+    const totalSteps = 3;
+    
+    // Progress indicator
+    const progressHTML = `
+        <div style="display: flex; gap: var(--space-2); margin-bottom: var(--space-4);">
+            ${[1, 2, 3].map(s => `
+                <div style="flex: 1; height: 3px; background: ${s <= step ? 'var(--color-gray-900)' : 'var(--color-gray-200)'}; border-radius: 2px;"></div>
+            `).join('')}
+        </div>
+    `;
+    
+    if (step === 1) {
+        return `
+            <h3 style="margin-bottom: var(--space-2); color: var(--color-gray-900);">Add New Person to Entities</h3>
+            <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--color-gray-600);">Step 1 of ${totalSteps}: Basic Information</p>
+            ${progressHTML}
+            <p style="margin-bottom: var(--space-4); line-height: var(--leading-normal); color: var(--color-gray-700);">
+                Let's start with some basic information about this person.
+            </p>
+            
+            <form id="addPersonForm" class="hybrid-form" data-step="1">
+                <!-- First Name -->
+                <div class="form-field">
+                    <label class="form-label">First Name <span style="color: #dc2626;">*</span></label>
                     <input 
                         type="text" 
-                        id="personCompanySearch" 
+                        id="personFirstName" 
                         class="search-input"
-                        placeholder="Search for company..."
+                        placeholder="Enter first name..."
                         autocomplete="off"
+                        value="${formData.firstName || ''}"
+                        required
                     />
-                    <div class="search-results" id="personCompanyResults"></div>
-                    <input type="hidden" id="selectedPersonCompanyId" />
                 </div>
-                <div class="selected-item" id="selectedPersonCompany" style="display: none;"></div>
-            </div>
 
-            <!-- Email -->
-            <div class="form-field">
-                <label class="form-label">Email <span style="color: #dc2626;">*</span></label>
-                <input 
-                    type="email" 
-                    id="personEmail" 
-                    class="search-input"
-                    placeholder="email@example.com"
-                    autocomplete="off"
-                    required
-                />
-            </div>
+                <!-- Last Name -->
+                <div class="form-field">
+                    <label class="form-label">Last Name <span style="color: #dc2626;">*</span></label>
+                    <input 
+                        type="text" 
+                        id="personLastName" 
+                        class="search-input"
+                        placeholder="Enter last name..."
+                        autocomplete="off"
+                        value="${formData.lastName || ''}"
+                        required
+                    />
+                </div>
 
-            <div class="form-actions">
-                <button type="button" class="form-btn-secondary" id="cancelAddPersonBtn">Cancel</button>
-                <button type="submit" class="form-btn-primary" id="submitAddPersonBtn" disabled>Add Person</button>
-            </div>
-        </form>
-    `;
+                <!-- Title -->
+                <div class="form-field">
+                    <label class="form-label">Title <span style="color: #dc2626;">*</span></label>
+                    <input 
+                        type="text" 
+                        id="personTitle" 
+                        class="search-input"
+                        placeholder="e.g., Chief Financial Officer"
+                        autocomplete="off"
+                        value="${formData.title || ''}"
+                        required
+                    />
+                </div>
+
+                <!-- Email -->
+                <div class="form-field">
+                    <label class="form-label">Email <span style="color: #dc2626;">*</span></label>
+                    <input 
+                        type="email" 
+                        id="personEmail" 
+                        class="search-input"
+                        placeholder="email@example.com"
+                        autocomplete="off"
+                        value="${formData.email || ''}"
+                        required
+                    />
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="form-btn-secondary" id="cancelAddPersonBtn">Cancel</button>
+                    <button type="button" class="form-btn-primary" id="nextStepBtn">Next</button>
+                </div>
+            </form>
+        `;
+    } else if (step === 2) {
+        return `
+            <h3 style="margin-bottom: var(--space-2); color: var(--color-gray-900);">Add New Person to Entities</h3>
+            <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--color-gray-600);">Step 2 of ${totalSteps}: Personal Details</p>
+            ${progressHTML}
+            <p style="margin-bottom: var(--space-4); line-height: var(--leading-normal); color: var(--color-gray-700);">
+                Now, let's collect some personal details.
+            </p>
+            
+            <form id="addPersonForm" class="hybrid-form" data-step="2">
+                <!-- Date of Birth -->
+                <div class="form-field">
+                    <label class="form-label">Date of Birth <span style="color: #dc2626;">*</span></label>
+                    <input 
+                        type="date" 
+                        id="personDOB" 
+                        class="search-input"
+                        value="${formData.dob || ''}"
+                        required
+                    />
+                </div>
+
+                <!-- Nationality -->
+                <div class="form-field">
+                    <label class="form-label">Nationality <span style="color: #dc2626;">*</span></label>
+                    <select 
+                        id="personNationality" 
+                        class="search-input"
+                        required
+                    >
+                        <option value="">Select nationality...</option>
+                        <option value="US" ${formData.nationality === 'US' ? 'selected' : ''}>United States</option>
+                        <option value="SG" ${formData.nationality === 'SG' ? 'selected' : ''}>Singapore</option>
+                        <option value="GB" ${formData.nationality === 'GB' ? 'selected' : ''}>United Kingdom</option>
+                        <option value="IE" ${formData.nationality === 'IE' ? 'selected' : ''}>Ireland</option>
+                        <option value="NL" ${formData.nationality === 'NL' ? 'selected' : ''}>Netherlands</option>
+                        <option value="CN" ${formData.nationality === 'CN' ? 'selected' : ''}>China</option>
+                        <option value="IN" ${formData.nationality === 'IN' ? 'selected' : ''}>India</option>
+                        <option value="JP" ${formData.nationality === 'JP' ? 'selected' : ''}>Japan</option>
+                        <option value="AU" ${formData.nationality === 'AU' ? 'selected' : ''}>Australia</option>
+                        <option value="CA" ${formData.nationality === 'CA' ? 'selected' : ''}>Canada</option>
+                        <option value="DE" ${formData.nationality === 'DE' ? 'selected' : ''}>Germany</option>
+                        <option value="FR" ${formData.nationality === 'FR' ? 'selected' : ''}>France</option>
+                        <option value="IT" ${formData.nationality === 'IT' ? 'selected' : ''}>Italy</option>
+                        <option value="MY" ${formData.nationality === 'MY' ? 'selected' : ''}>Malaysia</option>
+                    </select>
+                </div>
+
+                <!-- Passport Number -->
+                <div class="form-field">
+                    <label class="form-label">Passport Number <span style="color: #dc2626;">*</span></label>
+                    <input 
+                        type="text" 
+                        id="personPassport" 
+                        class="search-input"
+                        placeholder="Enter passport number..."
+                        autocomplete="off"
+                        value="${formData.passport || ''}"
+                        required
+                    />
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="form-btn-secondary" id="backStepBtn">Back</button>
+                    <button type="button" class="form-btn-primary" id="nextStepBtn">Next</button>
+                </div>
+            </form>
+        `;
+    } else if (step === 3) {
+        return `
+            <h3 style="margin-bottom: var(--space-2); color: var(--color-gray-900);">Add New Person to Entities</h3>
+            <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--color-gray-600);">Step 3 of ${totalSteps}: Residential Address</p>
+            ${progressHTML}
+            <p style="margin-bottom: var(--space-4); line-height: var(--leading-normal); color: var(--color-gray-700);">
+                Finally, we need their residential address.
+            </p>
+            
+            <form id="addPersonForm" class="hybrid-form" data-step="3">
+                <!-- Street Address -->
+                <div class="form-field">
+                    <label class="form-label">Street Address <span style="color: #dc2626;">*</span></label>
+                    <input 
+                        type="text" 
+                        id="personStreet" 
+                        class="search-input"
+                        placeholder="Enter street address..."
+                        autocomplete="off"
+                        value="${formData.street || ''}"
+                        required
+                    />
+                </div>
+
+                <!-- City -->
+                <div class="form-field">
+                    <label class="form-label">City <span style="color: #dc2626;">*</span></label>
+                    <input 
+                        type="text" 
+                        id="personCity" 
+                        class="search-input"
+                        placeholder="Enter city..."
+                        autocomplete="off"
+                        value="${formData.city || ''}"
+                        required
+                    />
+                </div>
+
+                <!-- State/Province -->
+                <div class="form-field">
+                    <label class="form-label">State/Province</label>
+                    <input 
+                        type="text" 
+                        id="personState" 
+                        class="search-input"
+                        placeholder="Enter state or province..."
+                        autocomplete="off"
+                        value="${formData.state || ''}"
+                    />
+                </div>
+
+                <!-- Postal Code -->
+                <div class="form-field">
+                    <label class="form-label">Postal Code <span style="color: #dc2626;">*</span></label>
+                    <input 
+                        type="text" 
+                        id="personPostal" 
+                        class="search-input"
+                        placeholder="Enter postal code..."
+                        autocomplete="off"
+                        value="${formData.postal || ''}"
+                        required
+                    />
+                </div>
+
+                <!-- Country -->
+                <div class="form-field">
+                    <label class="form-label">Country <span style="color: #dc2626;">*</span></label>
+                    <select 
+                        id="personCountry" 
+                        class="search-input"
+                        required
+                    >
+                        <option value="">Select country...</option>
+                        <option value="US" ${formData.country === 'US' ? 'selected' : ''}>United States</option>
+                        <option value="SG" ${formData.country === 'SG' ? 'selected' : ''}>Singapore</option>
+                        <option value="GB" ${formData.country === 'GB' ? 'selected' : ''}>United Kingdom</option>
+                        <option value="IE" ${formData.country === 'IE' ? 'selected' : ''}>Ireland</option>
+                        <option value="NL" ${formData.country === 'NL' ? 'selected' : ''}>Netherlands</option>
+                        <option value="CN" ${formData.country === 'CN' ? 'selected' : ''}>China</option>
+                        <option value="IN" ${formData.country === 'IN' ? 'selected' : ''}>India</option>
+                        <option value="JP" ${formData.country === 'JP' ? 'selected' : ''}>Japan</option>
+                        <option value="AU" ${formData.country === 'AU' ? 'selected' : ''}>Australia</option>
+                        <option value="CA" ${formData.country === 'CA' ? 'selected' : ''}>Canada</option>
+                        <option value="DE" ${formData.country === 'DE' ? 'selected' : ''}>Germany</option>
+                        <option value="FR" ${formData.country === 'FR' ? 'selected' : ''}>France</option>
+                        <option value="IT" ${formData.country === 'IT' ? 'selected' : ''}>Italy</option>
+                        <option value="MY" ${formData.country === 'MY' ? 'selected' : ''}>Malaysia</option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="form-btn-secondary" id="backStepBtn">Back</button>
+                    <button type="submit" class="form-btn-primary" id="submitAddPersonBtn">Add Person</button>
+                </div>
+            </form>
+        `;
+    }
 }
 
 function generateAppointDirectorForm(appointmentType = 'replace', savedState = {}, newlyAddedPerson = null) {
@@ -1204,9 +1402,6 @@ function generateAppointDirectorForm(appointmentType = 'replace', savedState = {
                         </div>
                     ` : ''}
                 </div>
-                <a href="#" class="add-person-link" onclick="event.preventDefault(); showAddPersonForm('${appointmentType}');">
-                    Need to add this appointee?
-                </a>
             </div>
 
             <div class="form-actions">
@@ -1302,6 +1497,18 @@ function initializeAppointDirectorForm() {
             document.getElementById('selectedAppointeeId').value = item.id;
             showSelectedItem('selectedAppointee', item.name, 'appointeeSearch', 'appointeeResults');
             checkFormCompletion();
+        },
+        {
+            html: `
+                <div style="display: flex; align-items: center; gap: var(--space-2); color: var(--color-gray-900);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    <span style="font-weight: 500;">Add New Person</span>
+                </div>
+            `,
+            onClick: () => showAddPersonForm(appointmentType)
         }
     );
 
@@ -1329,9 +1536,25 @@ function initializeAppointDirectorForm() {
             submitBtn.disabled = !(companyId && appointeeId);
         }
     }
+    
+    // If returning with a newly added person, ensure appointee field is enabled and button state is correct
+    if (newlyAddedId && appointeeSearch) {
+        appointeeSearch.disabled = false;
+        
+        // Check initial form completion state
+        checkFormCompletion();
+    }
+    
+    // If there are pre-selected values, check form completion
+    if (savedDirectorId || savedCompanyId) {
+        if (appointeeSearch) {
+            appointeeSearch.disabled = false;
+        }
+        checkFormCompletion();
+    }
 }
 
-function setupSearchField(input, resultsDiv, data, formatItem, onSelect) {
+function setupSearchField(input, resultsDiv, data, formatItem, onSelect, addAction = null) {
     input.addEventListener('input', function() {
         const query = this.value.toLowerCase().trim();
         
@@ -1351,16 +1574,30 @@ function setupSearchField(input, resultsDiv, data, formatItem, onSelect) {
 
         if (filtered.length === 0) {
             resultsDiv.innerHTML = '<div class="search-result-item no-results">No results found</div>';
+            // Still show add action even when no results
+            if (addAction) {
+                resultsDiv.innerHTML += `<div class="search-result-action" data-action="add-new">${addAction.html}</div>`;
+            }
             resultsDiv.style.display = 'block';
+            positionDropdown();
             return;
         }
 
         resultsDiv.innerHTML = filtered.map(item => 
             `<div class="search-result-item" data-id="${item.id}">${formatItem(item)}</div>`
         ).join('');
+        
+        // Add custom action at bottom if provided
+        if (addAction) {
+            resultsDiv.innerHTML += `<div class="search-result-action" data-action="add-new">${addAction.html}</div>`;
+        }
+        
         resultsDiv.style.display = 'block';
+        
+        // Check if dropdown should open above or below
+        positionDropdown();
 
-        // Add click handlers
+        // Add click handlers for items
         resultsDiv.querySelectorAll('.search-result-item:not(.no-results)').forEach(el => {
             el.addEventListener('click', () => {
                 const itemId = el.getAttribute('data-id');
@@ -1370,7 +1607,34 @@ function setupSearchField(input, resultsDiv, data, formatItem, onSelect) {
                 }
             });
         });
+        
+        // Add click handler for action
+        if (addAction) {
+            const actionEl = resultsDiv.querySelector('.search-result-action');
+            if (actionEl) {
+                actionEl.addEventListener('click', () => {
+                    addAction.onClick();
+                    resultsDiv.style.display = 'none';
+                    input.value = '';
+                });
+            }
+        }
     });
+    
+    // Function to determine if dropdown should show above or below
+    function positionDropdown() {
+        const inputRect = input.getBoundingClientRect();
+        const dropdownMaxHeight = 320; // matches CSS max-height
+        const spaceBelow = window.innerHeight - inputRect.bottom;
+        const spaceAbove = inputRect.top;
+        
+        // If not enough space below but more space above, show above
+        if (spaceBelow < dropdownMaxHeight && spaceAbove > spaceBelow) {
+            resultsDiv.classList.add('show-above');
+        } else {
+            resultsDiv.classList.remove('show-above');
+        }
+    }
 
     // Close results when clicking outside
     document.addEventListener('click', (e) => {
@@ -1422,7 +1686,7 @@ function clearSelection(containerId, inputId, resultsId) {
         input.focus();
     }
     
-    // Disable subsequent fields if clearing early fields
+    // Handle disabling subsequent fields for button-based forms
     const directorSearch = document.getElementById('directorSearch');
     const appointeeSearch = document.getElementById('appointeeSearch');
     
@@ -1442,100 +1706,184 @@ function clearSelection(containerId, inputId, resultsId) {
         }
     }
     
-    // Update form state
+    // Handle disabling continue button for text-based replacement workflow
+    if (inputId === 'replacementAppointeeSearch') {
+        const continueBtn = document.getElementById('continueToPreviewBtn');
+        if (continueBtn) {
+            continueBtn.disabled = true;
+            continueBtn.style.opacity = '0.5';
+            continueBtn.style.cursor = 'not-allowed';
+        }
+    }
+    
+    // Update form state for button-based forms
     const submitBtn = document.getElementById('submitFormBtn');
     if (submitBtn) submitBtn.disabled = true;
 }
 
 function initializeAddPersonForm() {
-    const personCompanySearch = document.getElementById('personCompanySearch');
-    const firstName = document.getElementById('personFirstName');
-    const lastName = document.getElementById('personLastName');
-    const title = document.getElementById('personTitle');
-    const email = document.getElementById('personEmail');
-    const form = document.getElementById('addPersonForm');
-    const submitBtn = document.getElementById('submitAddPersonBtn');
+    // Find all forms with this ID and get the last one (most recent in DOM)
+    const forms = document.querySelectorAll('#addPersonForm');
+    const form = forms[forms.length - 1]; // Get the last one
     
-    if (!personCompanySearch || !form) return;
-
-    // Company search for add person form
-    setupSearchField(
-        personCompanySearch,
-        document.getElementById('personCompanyResults'),
-        mockCompanies,
-        (item) => `
-            <div style="display: flex; align-items: center; gap: var(--space-2);">
-                <span style="font-size: var(--text-lg);">${item.flag}</span>
-                <div style="flex: 1;">
-                    <div style="font-weight: 500; color: var(--color-gray-900);">${item.name}</div>
-                    <div style="font-size: var(--text-xs); color: var(--color-gray-500);">${item.location}, ${item.country}</div>
-                </div>
-            </div>
-        `,
-        (item) => {
-            document.getElementById('selectedPersonCompanyId').value = item.id;
-            showSelectedItem('selectedPersonCompany', `${item.flag} ${item.name}`, 'personCompanySearch', 'personCompanyResults');
-            checkAddPersonFormCompletion();
-        }
-    );
-
-    // Add input listeners to check form completion
-    [firstName, lastName, title, email].forEach(input => {
-        if (input) {
-            input.addEventListener('input', checkAddPersonFormCompletion);
-        }
-    });
-
-    // Form submission
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        handleAddPersonFormSubmit();
-    });
-
-    // Cancel button
-    document.getElementById('cancelAddPersonBtn').addEventListener('click', () => {
-        // Return to appointment form with previous state
-        returnToAppointmentForm();
-    });
-
-    function checkAddPersonFormCompletion() {
-        const companyId = document.getElementById('selectedPersonCompanyId').value;
-        const firstNameVal = firstName.value.trim();
-        const lastNameVal = lastName.value.trim();
-        const titleVal = title.value.trim();
-        const emailVal = email.value.trim();
+    if (!form) {
+        return;
+    }
+    
+    const step = parseInt(form.getAttribute('data-step'));
+    const appointmentType = window.tempAppointmentFormState?.appointmentType || 'replace';
+    
+    // Step 1: Basic Information
+    if (step === 1) {
+        const firstName = document.getElementById('personFirstName');
+        const lastName = document.getElementById('personLastName');
+        const title = document.getElementById('personTitle');
+        const email = document.getElementById('personEmail');
+        const nextBtn = document.getElementById('nextStepBtn');
+        const cancelBtn = document.getElementById('cancelAddPersonBtn');
         
-        submitBtn.disabled = !(companyId && firstNameVal && lastNameVal && titleVal && emailVal);
+        // Next button
+        if (nextBtn) {
+            nextBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Save step 1 data
+                window.addPersonFormData.firstName = firstName ? firstName.value.trim() : '';
+                window.addPersonFormData.lastName = lastName ? lastName.value.trim() : '';
+                window.addPersonFormData.title = title ? title.value.trim() : '';
+                window.addPersonFormData.email = email ? email.value.trim() : '';
+                
+                // Move to step 2
+                showAddPersonForm(appointmentType, 2);
+            });
+        }
+        
+        // Cancel button
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                returnToAppointmentForm();
+            });
+        }
+    }
+    // Step 2: Personal Details
+    else if (step === 2) {
+        const dob = document.getElementById('personDOB');
+        const nationality = document.getElementById('personNationality');
+        const passport = document.getElementById('personPassport');
+        
+        // Get the buttons from the current form context
+        const nextBtn = form.querySelector('#nextStepBtn');
+        const backBtn = form.querySelector('#backStepBtn');
+        
+        // Next button
+        if (nextBtn) {
+            nextBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Save step 2 data
+                window.addPersonFormData.dob = dob ? dob.value : '';
+                window.addPersonFormData.nationality = nationality ? nationality.value : '';
+                window.addPersonFormData.passport = passport ? passport.value.trim() : '';
+                
+                // Move to step 3
+                showAddPersonForm(appointmentType, 3);
+            });
+        }
+        
+        // Back button
+        if (backBtn) {
+            backBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                showAddPersonForm(appointmentType, 1);
+            });
+        }
+    }
+    // Step 3: Residential Address
+    else if (step === 3) {
+        const street = document.getElementById('personStreet');
+        const city = document.getElementById('personCity');
+        const state = document.getElementById('personState');
+        const postal = document.getElementById('personPostal');
+        const country = document.getElementById('personCountry');
+        const submitBtn = document.getElementById('submitAddPersonBtn');
+        const backBtn = document.getElementById('backStepBtn');
+        
+        // Form submission
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Save step 3 data
+            window.addPersonFormData.street = street ? street.value.trim() : '';
+            window.addPersonFormData.city = city ? city.value.trim() : '';
+            window.addPersonFormData.state = state ? state.value.trim() : '';
+            window.addPersonFormData.postal = postal ? postal.value.trim() : '';
+            window.addPersonFormData.country = country ? country.value : '';
+            
+            handleAddPersonFormSubmit();
+        });
+        
+        // Back button
+        if (backBtn) {
+            backBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                showAddPersonForm(appointmentType, 2);
+            });
+        }
     }
 }
 
 function handleAddPersonFormSubmit() {
-    const firstName = document.getElementById('personFirstName').value.trim();
-    const lastName = document.getElementById('personLastName').value.trim();
-    const title = document.getElementById('personTitle').value.trim();
-    const email = document.getElementById('personEmail').value.trim();
-    const companyId = document.getElementById('selectedPersonCompanyId').value;
+    const formData = window.addPersonFormData;
     
-    const company = mockCompanies.find(c => c.id === companyId);
-    
-    if (!firstName || !lastName || !title || !email || !company) return;
+    // Validate all required fields are present
+    if (!formData.firstName || !formData.lastName || !formData.title || !formData.email ||
+        !formData.dob || !formData.nationality || !formData.passport ||
+        !formData.street || !formData.city || !formData.postal || !formData.country) {
+        return;
+    }
     
     // Generate new person ID
     const newId = 'p' + (mockPeople.length + 1);
     
-    // Create full name (handle nicknames/quotes if any)
-    const fullName = `${firstName} ${lastName}`;
+    // Create full name
+    const fullName = `${formData.firstName} ${formData.lastName}`;
     
-    // Create new person object
+    // Get company from saved state (use the company from the appointment form)
+    const savedState = window.tempAppointmentFormState || {};
+    let company = null;
+    if (savedState.companyId) {
+        company = mockCompanies.find(c => c.id === savedState.companyId);
+    }
+    
+    // Create new person object with all collected data
     const newPerson = {
         id: newId,
         name: fullName,
-        title: title,
-        email: email,
-        company: company.name
+        title: formData.title,
+        email: formData.email,
+        company: company ? company.name : 'Unknown',
+        dob: formData.dob,
+        nationality: formData.nationality,
+        passport: formData.passport,
+        address: {
+            street: formData.street,
+            city: formData.city,
+            state: formData.state,
+            postal: formData.postal,
+            country: formData.country
+        }
     };
     
-    // Add to mockPeople array
+    // Add to mockPeople array (mockAppointees is a reference to mockPeople, so this updates both)
     mockPeople.push(newPerson);
     
     // Add user message
@@ -1545,12 +1893,20 @@ function handleAddPersonFormSubmit() {
         // Show success message
         setTimeout(() => {
             addMessageToChat(currentChatId, 'assistant', 
-                `Great! I've added <strong>${fullName}</strong> (${title}) to the Entities system. Now let's complete the appointment.`
+                `Great! I've added <strong>${fullName}</strong> (${formData.title}) to the Entities system. Now let's complete the appointment.`
             );
             
             // Return to appointment form with the new person selected
             setTimeout(() => {
                 returnToAppointmentForm(newPerson);
+                
+                // Final scroll to ensure we're at the bottom
+                setTimeout(() => {
+                    const chatThread = document.getElementById('chatThread');
+                    if (chatThread) {
+                        chatThread.scrollTop = chatThread.scrollHeight;
+                    }
+                }, 400);
             }, 600);
         }, 400);
     }
@@ -1560,11 +1916,54 @@ function returnToAppointmentForm(newlyAddedPerson = null) {
     const savedState = window.tempAppointmentFormState || {};
     const appointmentType = savedState.appointmentType || 'replace';
     
-    // Show the appointment form again
-    const response = generateAppointDirectorForm(appointmentType, savedState, newlyAddedPerson);
+    // Check if we came from the text-based "Replace David Chen" workflow
+    // This is true when director was selected via disambiguation (not via form)
+    const isTextBasedWorkflow = savedState.directorId && window.selectedDisambiguatedDirector && 
+                                 savedState.directorId === window.selectedDisambiguatedDirector.id;
     
-    if (currentChatId) {
-        addMessageToChat(currentChatId, 'assistant', response);
+    if (isTextBasedWorkflow) {
+        // Return to the appointee search view with the director still selected
+        // Pass the newly added person to pre-populate the selection
+        const response = generateAppointeeSearchForReplacement(savedState.directorId, newlyAddedPerson);
+        
+        if (currentChatId) {
+            addMessageToChat(currentChatId, 'assistant', response);
+            
+            // Initialize the appointee search
+            setTimeout(() => {
+                initializeReplacementAppointeeSearch();
+                
+                // Debug: Check if hidden input has value
+                setTimeout(() => {
+                    const hiddenInputs = document.querySelectorAll('#selectedReplacementAppointeeId');
+                    const hiddenInput = hiddenInputs[hiddenInputs.length - 1];
+                    console.log('After initialization, hidden input value:', hiddenInput?.value);
+                }, 50);
+                
+                // Scroll to bottom after form is rendered
+                setTimeout(() => {
+                    const chatThread = document.getElementById('chatThread');
+                    if (chatThread) {
+                        chatThread.scrollTop = chatThread.scrollHeight;
+                    }
+                }, 100);
+            }, 150);
+        }
+    } else {
+        // Show the appointment form again (for button-based workflow)
+        const response = generateAppointDirectorForm(appointmentType, savedState, newlyAddedPerson);
+        
+        if (currentChatId) {
+            addMessageToChat(currentChatId, 'assistant', response);
+            
+            // Scroll to bottom after form is added
+            setTimeout(() => {
+                const chatThread = document.getElementById('chatThread');
+                if (chatThread) {
+                    chatThread.scrollTop = chatThread.scrollHeight;
+                }
+            }, 200);
+        }
     }
 }
 
@@ -1801,7 +2200,7 @@ function generateAppointmentPanelContent() {
 
             <!-- Documents Section (placeholder) -->
             <section class="panel-section" id="documentsSection">
-                <h4 class="panel-section-title">Required Documents</h4>
+                <h4 class="panel-section-title">Legal Forms</h4>
                 <div class="empty-state" id="documentsEmptyState" style="padding: var(--space-4); text-align: center; color: var(--color-gray-500); font-size: var(--text-sm);">
                     Awaiting document review...
                 </div>
@@ -1810,16 +2209,15 @@ function generateAppointmentPanelContent() {
 
             <!-- Workflow Section -->
             <section class="panel-section">
-                <h4 class="panel-section-title">Automated Workflow</h4>
+                <h4 class="panel-section-title">Workflow</h4>
                 <p class="panel-description">
                     When you start the process, our concierge agent will coordinate the following steps:
                 </p>
                 
                 <div class="workflow-steps">
                     <div class="workflow-step">
-                        <div class="workflow-step-number">1</div>
                         <div class="workflow-step-content">
-                            <div class="workflow-step-title">Board Approval</div>
+                            <div class="workflow-step-title">Approval</div>
                             <div class="workflow-step-description">
                                 Submit Board Resolution to the <strong>Boards</strong> system for asynchronous approval by board members.
                             </div>
@@ -1827,21 +2225,22 @@ function generateAppointmentPanelContent() {
                     </div>
                     
                     <div class="workflow-step">
-                        <div class="workflow-step-number">2</div>
                         <div class="workflow-step-content">
-                            <div class="workflow-step-title">Email Regulatory Forms</div>
+                            <div class="workflow-step-title">Legal Forms</div>
                             <div class="workflow-step-description">
-                                Send Consent to Act and regulatory forms to <strong>${appointee.name}</strong> for signature. Monitor inbox for signed documents. You will need to file ${company.location === 'Singapore' ? '<strong>Form 45</strong>' : 'the required forms'} with the ${company.location}, ${company.country} regulatory agency after receiving signed documents.
+                                Draft and send legal documents including Board Resolution, Consent to Act, and ${company.location === 'Singapore' ? '<strong>Form 45</strong>' : 'regulatory forms'} to <strong>${appointee.name}</strong> for signature.
                             </div>
                         </div>
                     </div>
                     
                     <div class="workflow-step">
-                        <div class="workflow-step-number">3</div>
                         <div class="workflow-step-content">
-                            <div class="workflow-step-title">Update Entity Records</div>
+                            <div class="workflow-step-title">Filing</div>
                             <div class="workflow-step-description">
-                                Update <strong>Entities</strong> system to reflect ${isReplacement && director ? `${director.name}'s resignation and ` : ''}${appointee.name}'s appointment to the board.
+                                ${company.location === 'Singapore' 
+                                    ? 'File <strong>Form 45</strong> with ACRA (Accounting and Corporate Regulatory Authority). You can file manually or use e-Filing through the system.' 
+                                    : `File the required forms with the ${company.location}, ${company.country} regulatory agency.`
+                                }
                             </div>
                         </div>
                     </div>
@@ -2041,7 +2440,6 @@ function addApproversToPanel(approvers) {
     // Populate and show approvers list
     approversList.innerHTML = approvers.map(approver => `
         <div class="approver-item">
-            <div class="approver-avatar">${approver.initials}</div>
             <div class="approver-info">
                 <div class="approver-name">${approver.name}</div>
                 <div class="approver-role">${approver.role}</div>
@@ -2082,46 +2480,8 @@ function addDocumentsToPanel() {
                 <div class="document-name">Board Resolution</div>
                 <div class="document-meta">For board approval via Boards system</div>
             </div>
-            <button class="document-action" onclick="previewDocument('board-resolution')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-            </button>
-            <button class="document-action" onclick="downloadDocument('board-resolution')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-            </button>
-        </div>
-        
-        <div class="document-item">
-            <div class="document-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                </svg>
-            </div>
-            <div class="document-info">
-                <div class="document-name">Consent to Act as Director</div>
-                <div class="document-meta">For ${appointee.name} signature</div>
-            </div>
-            <button class="document-action" onclick="previewDocument('consent-form')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-            </button>
-            <button class="document-action" onclick="downloadDocument('consent-form')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
+            <button class="btn-secondary btn-sm" onclick="previewDocument('board-resolution')">
+                Review
             </button>
         </div>
         
@@ -2136,18 +2496,8 @@ function addDocumentsToPanel() {
                 <div class="document-name">${company && company.location === 'Singapore' ? 'Form 45' : 'Regulatory Filing Form'}</div>
                 <div class="document-meta">Government filing for ${company.location}, ${company.country}</div>
             </div>
-            <button class="document-action" onclick="previewDocument('regulatory-form')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-            </button>
-            <button class="document-action" onclick="downloadDocument('regulatory-form')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
+            <button class="btn-secondary btn-sm" onclick="previewDocument('regulatory-form')">
+                Review
             </button>
         </div>
     `;
@@ -2255,8 +2605,10 @@ function selectDisambiguatedDirector(directorId) {
     }
 }
 
-function generateAppointeeSearchForReplacement(directorId) {
+function generateAppointeeSearchForReplacement(directorId, preSelectedAppointee = null) {
     const director = mockPeople.find(p => p.id === directorId);
+    const continueEnabled = preSelectedAppointee ? '' : 'disabled';
+    const continueStyle = preSelectedAppointee ? 'opacity: 1; cursor: pointer;' : 'opacity: 0.5; cursor: not-allowed;';
     
     return `
         <h3 style="margin-bottom: var(--space-3); color: var(--color-gray-900);">Select Appointee</h3>
@@ -2272,10 +2624,23 @@ function generateAppointeeSearchForReplacement(directorId) {
                     id="replacementAppointeeSearch" 
                     class="search-input"
                     placeholder="Type name to search..."
+                    style="${preSelectedAppointee ? 'display: none;' : ''}"
                 />
-                <div id="selectedReplacementAppointee" class="selected-item" style="display: none;"></div>
+                <div id="selectedReplacementAppointee" class="selected-item" style="display: ${preSelectedAppointee ? 'block' : 'none'};">
+                    ${preSelectedAppointee ? `
+                        <div class="selected-chip">
+                            <span>${preSelectedAppointee.name}</span>
+                            <button type="button" class="remove-chip" onclick="clearSelection('selectedReplacementAppointee', 'replacementAppointeeSearch', 'replacementAppointeeResults')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
                 <div id="replacementAppointeeResults" class="search-results" style="display: none;"></div>
-                <input type="hidden" id="selectedReplacementAppointeeId" value="">
+                <input type="hidden" id="selectedReplacementAppointeeId" value="${preSelectedAppointee ? preSelectedAppointee.id : ''}">
             </div>
         </div>
         
@@ -2284,8 +2649,8 @@ function generateAppointeeSearchForReplacement(directorId) {
                 id="continueToPreviewBtn" 
                 class="panel-btn-primary" 
                 onclick="continueToPreviewPanel()"
-                disabled
-                style="opacity: 0.5; cursor: not-allowed;">
+                ${continueEnabled}
+                style="${continueStyle}">
                 Continue
             </button>
         </div>
@@ -2293,11 +2658,26 @@ function generateAppointeeSearchForReplacement(directorId) {
 }
 
 function continueToPreviewPanel() {
+    console.log('continueToPreviewPanel called');
+    
     const director = window.selectedDisambiguatedDirector;
-    const appointeeId = document.getElementById('selectedReplacementAppointeeId').value;
+    
+    // Find the most recent hidden input (there may be multiple in DOM from previous messages)
+    const hiddenInputs = document.querySelectorAll('#selectedReplacementAppointeeId');
+    const hiddenInput = hiddenInputs[hiddenInputs.length - 1]; // Get the last one
+    const appointeeId = hiddenInput?.value;
+    
     const appointee = mockPeople.find(p => p.id === appointeeId);
     
-    if (!director || !appointee) return;
+    console.log('Director:', director);
+    console.log('AppointeeId:', appointeeId);
+    console.log('Appointee:', appointee);
+    console.log('Found', hiddenInputs.length, 'hidden inputs, using last one');
+    
+    if (!director || !appointee) {
+        console.error('Missing director or appointee', { director, appointee });
+        return;
+    }
     
     // Find the company for this director (defaulting to Pacific Polymer Logistics for demo)
     const company = mockCompanies[4]; // Pacific Polymer Logistics Pte. Ltd. (Singapore)
@@ -2309,6 +2689,8 @@ function continueToPreviewPanel() {
         appointee: appointee,
         isReplacement: true
     };
+    
+    console.log('Opening appointment panel with:', window.selectedAppointment);
     
     // Send user message
     if (currentChatId) {
@@ -2330,7 +2712,16 @@ function initializeReplacementAppointeeSearch() {
     
     if (!appointeeSearch) return;
     
-    // Setup appointee search field
+    // Check if appointee is already pre-selected (search field is hidden)
+    const isPreSelected = appointeeSearch.style.display === 'none';
+    
+    if (isPreSelected) {
+        console.log('Appointee already pre-selected, skipping search setup');
+        // Don't setup search or focus since it's already selected
+        return;
+    }
+    
+    // Setup appointee search field only if not pre-selected
     setupSearchField(
         appointeeSearch,
         document.getElementById('replacementAppointeeResults'),
@@ -2342,7 +2733,13 @@ function initializeReplacementAppointeeSearch() {
             </div>
         `,
         (item) => {
-            document.getElementById('selectedReplacementAppointeeId').value = item.id;
+            // Get the most recent hidden input
+            const hiddenInputs = document.querySelectorAll('#selectedReplacementAppointeeId');
+            const hiddenInput = hiddenInputs[hiddenInputs.length - 1];
+            if (hiddenInput) {
+                hiddenInput.value = item.id;
+            }
+            
             showSelectedItem('selectedReplacementAppointee', item.name, 'replacementAppointeeSearch', 'replacementAppointeeResults');
             
             // Enable continue button
@@ -2351,6 +2748,18 @@ function initializeReplacementAppointeeSearch() {
                 continueBtn.style.opacity = '1';
                 continueBtn.style.cursor = 'pointer';
             }
+        },
+        {
+            html: `
+                <div style="display: flex; align-items: center; gap: var(--space-2); color: var(--color-gray-900);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    <span style="font-weight: 500;">Add New Person</span>
+                </div>
+            `,
+            onClick: () => showAddPersonForm('replace')
         }
     );
     

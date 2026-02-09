@@ -1880,6 +1880,7 @@ body {
 .right-panel-content {
     flex: 1;
     padding: 0;
+    padding-bottom: var(--space-6);
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -1905,7 +1906,7 @@ body {
 
 .panel-section:last-child {
     border-bottom: none;
-    padding-bottom: var(--space-6);
+    padding-bottom: var(--space-8);
 }
 
 .panel-section-title {
@@ -2259,6 +2260,8 @@ body {
     flex-direction: column;
     gap: var(--space-5);
     margin-top: var(--space-4);
+    position: relative;
+    z-index: 50;
 }
 
 .form-field {
@@ -2305,6 +2308,23 @@ body {
     cursor: not-allowed;
 }
 
+/* Date and select inputs */
+select.search-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M10.293 3.293L6 7.586 1.707 3.293A1 1 0 00.293 4.707l5 5a1 1 0 001.414 0l5-5a1 1 0 10-1.414-1.414z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--space-3) center;
+    padding-right: var(--space-8);
+}
+
+input[type="date"].search-input {
+    position: relative;
+}
+
+input[type="date"].search-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+}
+
 .search-results {
     position: absolute;
     top: 100%;
@@ -2317,8 +2337,15 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     max-height: 320px;
     overflow-y: auto;
-    z-index: 10;
+    z-index: 1000;
     display: none;
+}
+
+.search-results.show-above {
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    margin-bottom: var(--space-1);
 }
 
 .search-result-item {
@@ -2352,22 +2379,33 @@ body {
     background: transparent;
 }
 
+.search-result-action {
+    padding: var(--space-3);
+    cursor: pointer;
+    border-top: 1px solid var(--color-gray-200);
+    transition: background 0.15s ease;
+    font-size: var(--text-sm);
+    color: var(--color-gray-900);
+    font-weight: 500;
+    background: var(--color-white);
+}
+
+.search-result-action:hover {
+    background: var(--color-gray-50);
+}
+
+/* Remove border from last search item if followed by action */
+.search-result-item:has(+ .search-result-action) {
+    border-bottom: none;
+}
+
+/* Fallback for browsers that don't support :has() */
+.search-results .search-result-item:nth-last-child(2) {
+    border-bottom: none;
+}
+
 .selected-item {
     margin-top: var(--space-2);
-}
-
-.add-person-link {
-    display: inline-block;
-    margin-top: var(--space-2);
-    font-size: var(--text-sm);
-    color: var(--color-gray-600);
-    text-decoration: none;
-    transition: color 0.2s ease;
-}
-
-.add-person-link:hover {
-    color: var(--color-gray-900);
-    text-decoration: underline;
 }
 
 .selected-chip {
@@ -2417,6 +2455,8 @@ body {
     margin-top: var(--space-2);
     padding-top: var(--space-4);
     border-top: 1px solid var(--color-gray-200);
+    position: relative;
+    z-index: 100;
 }
 
 .form-btn-primary,
@@ -2627,6 +2667,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+    padding-bottom: var(--space-2);
 }
 
 .document-item {
