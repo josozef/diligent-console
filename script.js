@@ -2418,42 +2418,50 @@ function startAppointmentWorkflow() {
     }));
     
     // Initialize workflow steps with sub-statuses
+    // New structure: 3 main steps with documents and details
     processSteps = [
         {
-            id: 'board-approval',
-            name: 'Board Approval',
-            description: 'Submit Board Resolution to the Boards system for asynchronous approval',
+            id: 'approval',
+            name: 'Approval',
+            status: 'in_progress',
+            voteCount: null, // Will show e.g. "4/4 Approved"
             substeps: [
                 { id: 'approval-create', name: 'Create approval request', status: 'completed', time: 'Jan 7, 9:00 AM' },
                 { id: 'approval-send', name: 'Send to board members', status: 'in_progress', time: null },
                 { 
-                    id: 'approval', 
-                    name: 'Approval', 
+                    id: 'approval-responses', 
+                    name: 'Approval Responses', 
                     status: 'pending', 
                     time: null,
                     approvers: approvers // Nested approvers array
-                },
-                { id: 'approval-store', name: 'Store signed Board Resolution', status: 'pending', time: null, docLink: 'board-resolution-signed' }
+                }
             ]
         },
         {
-            id: 'regulatory-forms',
-            name: 'Email Regulatory Forms',
-            description: 'Send Consent to Act and regulatory forms to appointee for signature',
+            id: 'legal-forms',
+            name: 'Legal Forms',
+            status: 'pending',
+            documents: [
+                { id: 'board-resolution', name: 'Board Resolution', status: 'pending', docLink: null },
+                { id: 'consent-form', name: 'Consent to Act', status: 'pending', docLink: null },
+                { id: 'regulatory-form', name: company.location === 'Singapore' ? 'Form 45' : 'Regulatory Form', status: 'pending', docLink: null }
+            ],
             substeps: [
-                { id: 'forms-create', name: 'Generate regulatory forms', status: 'pending', time: null },
+                { id: 'forms-draft', name: 'Draft legal documents', status: 'pending', time: null },
                 { id: 'forms-send', name: `Email forms to ${appointee.name}`, status: 'pending', time: null },
                 { id: 'forms-receive', name: 'Receive signed documents', status: 'pending', time: null },
-                { id: 'forms-validate', name: 'Validate form completeness', status: 'pending', time: null },
-                { id: 'forms-store-consent', name: 'Store Consent to Act form', status: 'pending', time: null, docLink: 'consent-form-signed' },
-                { id: 'forms-store-regulatory', name: `Store signed ${company.location === 'Singapore' ? 'Form 45' : 'regulatory form'}`, status: 'pending', time: null, docLink: 'regulatory-form-signed', isManualFiling: true }
+                { id: 'forms-validate', name: 'Validate completeness', status: 'pending', time: null }
             ]
         },
         {
-            id: 'entity-update',
-            name: 'Update Entity Records',
-            description: 'Update Entities system to reflect board changes',
-            substeps: entitySubsteps
+            id: 'filing',
+            name: 'Filing',
+            status: 'pending',
+            filingMethod: company.location === 'Singapore' ? 'e-file' : 'manual',
+            filingInstructions: company.location === 'Singapore' 
+                ? 'File Form 45 with ACRA using the e-Filing system below.'
+                : 'Download the signed regulatory form and file with the appropriate regulatory body.',
+            substeps: []
         }
     ];
     
@@ -2505,17 +2513,228 @@ function openInProgressPanel() {
 }
 
 function generateInProgressPanel() {
+    const approvalStep = processSteps.find(s => s.id === 'approval');
+    const legalStep = processSteps.find(s => s.id === 'legal-forms');
+    const filingStep = processSteps.find(s => s.id === 'filing');
+    
     return `
         <div class="in-progress-panel">
-            <!-- Workflow Progress -->
-            <section class="panel-section" style="flex: 1; overflow-y: auto;">
-                <h4 class="panel-section-title">Workflow Progress</h4>
-                
-                <div class="process-steps">
-                    ${processSteps.map((step, stepIdx) => generateStepHTML(step, stepIdx)).join('')}
+            <!-- Hero Status Panel -->
+            <section class="panel-section">
+                <div class="status-hero">
+                    <div class="status-hero-step ${approvalStep.status}">
+                        ${getHeroStatusIcon(approvalStep.status)}
+                        <div class="status-hero-step-content">
+                            <div class="status-hero-step-title">Approval</div>
+                            ${approvalStep.voteCount 
+                                ? `<div class="status-hero-step-meta">${approvalStep.voteCount}</div>`
+                                : approvalStep.status === 'completed'
+                                    ? `<div class="status-hero-step-meta">Complete</div>`
+                                    : ''
+                            }
+                        </div>
+                    </div>
+                    
+                    <div class="status-hero-step ${legalStep.status}">
+                        ${getHeroStatusIcon(legalStep.status)}
+                        <div class="status-hero-step-content">
+                            <div class="status-hero-step-title">Legal Forms</div>
+                            ${legalStep.status === 'completed' 
+                                ? `<div class="status-hero-step-meta">Complete</div>`
+                                : ''
+                            }
+                        </div>
+                    </div>
+                    
+                    <div class="status-hero-step ${filingStep.status}">
+                        ${getHeroStatusIcon(filingStep.status)}
+                        <div class="status-hero-step-content">
+                            <div class="status-hero-step-title">Filing</div>
+                            ${filingStep.status === 'completed' 
+                                ? `<div class="status-hero-step-meta">Complete</div>`
+                                : ''
+                            }
+                        </div>
+                    </div>
                 </div>
             </section>
+            
+            <!-- Expandable Detail Sections -->
+            <div style="flex: 1; overflow-y: auto;">
+                ${generateApprovalSection(approvalStep)}
+                ${generateLegalFormsSection(legalStep)}
+                ${generateFilingSection(filingStep)}
+            </div>
         </div>
+    `;
+}
+
+function getHeroStatusIcon(status) {
+    switch(status) {
+        case 'completed':
+            return `<div class="status-hero-icon status-hero-icon-completed">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </div>`;
+        case 'in_progress':
+            return `<div class="status-hero-icon status-hero-icon-in-progress">
+                <div class="status-dot status-dot-in-progress"></div>
+            </div>`;
+        case 'pending':
+        default:
+            return `<div class="status-hero-icon status-hero-icon-pending">
+                <div class="status-dot status-dot-pending"></div>
+            </div>`;
+    }
+}
+
+function generateApprovalSection(step) {
+    if (step.status === 'pending') return '';
+    
+    const approvalSubstep = step.substeps.find(s => s.id === 'approval-responses');
+    const approvers = approvalSubstep ? approvalSubstep.approvers : [];
+    
+    return `
+        <section class="panel-section">
+            <h4 class="panel-section-title">Approval Details</h4>
+            
+            <div class="process-substeps">
+                ${step.substeps.map(substep => {
+                    // Special handling for approvers
+                    if (substep.approvers) {
+                        return `
+                            <div class="process-substep-group">
+                                <div class="substep-group-title">Board Member Responses</div>
+                                ${substep.approvers.map(approver => `
+                                    <div class="approver-item">
+                                        <div class="approver-info">
+                                            <div class="approver-name">${approver.name}</div>
+                                            <div class="approver-title">${approver.title}</div>
+                                        </div>
+                                        <div class="approver-response">
+                                            ${approver.vote 
+                                                ? `<span class="vote-badge vote-approved">${approver.vote}</span>
+                                                   <span class="approver-time">${approver.time}</span>`
+                                                : `<span class="vote-badge vote-pending">Pending</span>`
+                                            }
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                    }
+                    
+                    return `
+                        <div class="process-substep ${substep.status}">
+                            <div class="substep-indicator">
+                                ${getStatusIcon(substep.status)}
+                            </div>
+                            <div class="substep-content">
+                                <div class="substep-name">${substep.name}</div>
+                                ${substep.status === 'in_progress' 
+                                    ? '<div class="substep-meta">In progress...</div>'
+                                    : substep.time 
+                                        ? `<div class="substep-meta">Completed ${substep.time}</div>`
+                                        : ''
+                                }
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </section>
+    `;
+}
+
+function generateLegalFormsSection(step) {
+    if (step.status === 'pending') return '';
+    
+    return `
+        <section class="panel-section">
+            <h4 class="panel-section-title">Legal Documents</h4>
+            
+            <div class="documents-list">
+                ${step.documents.map(doc => `
+                    <div class="document-item ${doc.status}">
+                        <div class="document-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                        </div>
+                        <div class="document-info">
+                            <div class="document-name">${doc.name}</div>
+                            <div class="document-status-text">
+                                ${doc.status === 'completed' ? 'Signed & Stored' : 
+                                  doc.status === 'in_progress' ? 'In Progress' : 
+                                  'Pending'}
+                            </div>
+                        </div>
+                        ${doc.status === 'completed' && doc.docLink 
+                            ? `<button class="btn-secondary btn-sm" onclick="event.preventDefault(); openDocumentFromWorkflow('${doc.docLink}');">
+                                View
+                               </button>`
+                            : ''
+                        }
+                    </div>
+                `).join('')}
+            </div>
+            
+            ${step.substeps.length > 0 ? `
+                <div class="process-substeps" style="margin-top: var(--space-4);">
+                    ${step.substeps.map(substep => `
+                        <div class="process-substep ${substep.status}">
+                            <div class="substep-indicator">
+                                ${getStatusIcon(substep.status)}
+                            </div>
+                            <div class="substep-content">
+                                <div class="substep-name">${substep.name}</div>
+                                ${substep.status === 'in_progress' 
+                                    ? '<div class="substep-meta">In progress...</div>'
+                                    : substep.time 
+                                        ? `<div class="substep-meta">Completed ${substep.time}</div>`
+                                        : ''
+                                }
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+        </section>
+    `;
+}
+
+function generateFilingSection(step) {
+    if (step.status === 'pending') return '';
+    
+    return `
+        <section class="panel-section">
+            <h4 class="panel-section-title">Regulatory Filing</h4>
+            
+            <div class="filing-instructions">
+                <p>${step.filingInstructions}</p>
+                
+                ${step.filingMethod === 'e-file' 
+                    ? `<button class="btn-primary" onclick="eFileDocument()" style="margin-top: var(--space-3);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-2);">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        E-File Form 45 with ACRA
+                       </button>`
+                    : `<button class="btn-secondary" onclick="downloadFilingDocuments()" style="margin-top: var(--space-3);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-2);">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download Filing Documents
+                       </button>`
+                }
+            </div>
+        </section>
     `;
 }
 
@@ -2683,8 +2902,8 @@ function simulateLiveUpdates() {
     
     // Timeline spanning 5 business days (Jan 7-13, 2025, skipping weekend)
     // Get approvers from processSteps
-    const approvalStep = processSteps.find(s => s.id === 'board-approval');
-    const approvalSubstep = approvalStep.substeps.find(s => s.id === 'approval');
+    const approvalStep = processSteps.find(s => s.id === 'approval');
+    const approvalSubstep = approvalStep.substeps.find(s => s.id === 'approval-responses');
     const approvers = approvalSubstep.approvers;
     
     // Create timeline with approval times (will be randomized)
@@ -2727,164 +2946,406 @@ function simulateLiveUpdates() {
     
     const timeline = {
         // Business Day 1: Tuesday, Jan 7 - Board Approval starts
+        'approval-create': 'Jan 7, 9:00 AM',
         'approval-send': 'Jan 7, 9:15 AM',
-        'approval': approvalCompleteTime, // Completed when all approvers respond
-        'approval-store': storeTime,
+        'approval-responses': approvalCompleteTime, // Completed when all approvers respond
         
-        // Business Day 3: Thursday, Jan 9 - Forms preparation and sending
-        'forms-create': 'Jan 9, 10:00 AM',
+        // Legal forms (can start in parallel with approvals)
+        'forms-draft': 'Jan 9, 10:00 AM',
         'forms-send': 'Jan 9, 10:30 AM',
         'forms-receive': 'Jan 10, 2:15 PM',
         'forms-validate': 'Jan 10, 2:30 PM',
-        'forms-store-consent': 'Jan 10, 2:45 PM',
-        'forms-store-regulatory': 'Jan 10, 3:00 PM',
-        
-        // Business Day 5: Monday, Jan 13 - Entity updates
-        'entity-resign': 'Jan 13, 2:00 PM',
-        'entity-appoint': 'Jan 13, 2:15 PM',
         
         // Add approver times
         ...approverTimeMap
     };
     
-    // Build updates dynamically based on actual process steps
+    // Build updates for the new workflow structure (sped up for demo: ~10 seconds total)
     const updates = [];
-    let currentDelay = 2000;
+    let approvalDelay = 500; // Track approval timeline
+    let legalDelay = 500; // Track legal forms timeline (runs in parallel)
+    let approverUpdates = [];
     
-    processSteps.forEach(step => {
-        step.substeps.forEach(substep => {
-            // Skip if already completed
-            if (substep.status === 'completed') return;
+    // APPROVAL STEP UPDATES (approvalStep already declared above)
+    approvalStep.substeps.forEach(substep => {
+        if (substep.status === 'completed') return;
+        
+        if (substep.approvers) {
+            // Mark approval-responses as in_progress
+            updates.push({
+                type: 'substep',
+                stepId: 'approval',
+                substepId: substep.id,
+                status: 'in_progress',
+                delay: approvalDelay
+            });
+            approvalDelay += 500; // 0.5s
             
-            // Special handling for approval substep with nested approvers
-            if (substep.approvers) {
-                // Mark approval as in_progress when first approver starts
+            // Create approver updates
+            approverUpdates = substep.approvers.map(approver => ({
+                type: 'approver',
+                stepId: 'approval',
+                substepId: substep.id,
+                approverId: approver.id,
+                vote: 'Approved',
+                time: timeline[approver.id],
+                timestamp: timeline[approver.id],
+                delay: approvalDelay,
+            }));
+            
+            // Sort by timestamp
+            approverUpdates.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+            
+            // Add approver updates with delays between them
+            approverUpdates.forEach((update, idx) => {
+                update.delay = approvalDelay;
+                updates.push(update);
+                approvalDelay += 1500; // 1.5s between each approver
+            });
+            
+            // Mark approval step complete and update vote count
+            updates.push({
+                type: 'step-complete',
+                stepId: 'approval',
+                substepId: substep.id,
+                substepStatus: 'completed',
+                stepStatus: 'completed',
+                voteCount: `${approvers.length}/${approvers.length} Approved`,
+                delay: approvalDelay
+            });
+            approvalDelay += 300;
+        } else {
+            // Regular approval substeps
+            if (substep.status !== 'in_progress') {
                 updates.push({
-                    stepId: step.id,
+                    type: 'substep',
+                    stepId: 'approval',
                     substepId: substep.id,
                     status: 'in_progress',
-                    time: null,
-                    delay: currentDelay
+                    delay: approvalDelay
                 });
-                currentDelay = Math.floor(Math.random() * 2000) + 1500;
-                
-                // Create approver updates with their timestamps
-                const approverUpdates = substep.approvers.map(approver => ({
-                    stepId: step.id,
-                    substepId: substep.id,
-                    approverId: approver.id,
-                    status: 'completed',
-                    vote: 'Approved',
-                    time: timeline[approver.id] || 'Completed',
-                    timestamp: timeline[approver.id], // For sorting
-                    delay: currentDelay,
-                    isApprover: true
-                }));
-                
-                // Sort approver updates by timestamp so they come in chronologically
-                approverUpdates.sort((a, b) => {
-                    const timeA = a.timestamp || '';
-                    const timeB = b.timestamp || '';
-                    return timeA.localeCompare(timeB);
-                });
-                
-                // Add sorted approver updates
-                approverUpdates.forEach(update => {
-                    updates.push(update);
-                    currentDelay = Math.floor(Math.random() * 2000) + 2000;
-                });
-                
-                // Mark approval as completed when all approvers done
-                updates.push({
-                    stepId: step.id,
-                    substepId: substep.id,
-                    status: 'completed',
-                    time: timeline[substep.id] || 'Completed',
-                    delay: currentDelay
-                });
-                currentDelay = Math.floor(Math.random() * 2000) + 2000;
-            } else {
-                // Regular substep processing
-                // Add in_progress update
-                if (substep.status !== 'in_progress') {
-                    updates.push({
-                        stepId: step.id,
-                        substepId: substep.id,
-                        status: 'in_progress',
-                        time: null,
-                        delay: currentDelay
-                    });
-                    currentDelay = Math.floor(Math.random() * 2000) + 1500; // 1.5-3.5s
-                }
-                
-                // Add completed update with realistic timestamp
-                updates.push({
-                    stepId: step.id,
-                    substepId: substep.id,
-                    status: 'completed',
-                    time: timeline[substep.id] || 'Completed',
-                    delay: currentDelay
-                });
-                currentDelay = Math.floor(Math.random() * 2000) + 2000; // 2-4s
+                approvalDelay += 300;
             }
-        });
+            
+            updates.push({
+                type: 'substep',
+                stepId: 'approval',
+                substepId: substep.id,
+                status: 'completed',
+                time: 'Jan 7, 9:15 AM',
+                delay: approvalDelay
+            });
+            approvalDelay += 300;
+            
+            // START LEGAL FORMS IMMEDIATELY after approval-send completes
+            if (substep.id === 'approval-send') {
+                legalDelay = approvalDelay; // Sync legal forms to start now
+            }
+        }
     });
     
-    // Simulate progress through substeps
+    // LEGAL FORMS STEP UPDATES (starts immediately, runs in parallel with approvals)
+    const legalStep = processSteps.find(s => s.id === 'legal-forms');
+    
+    // Start drafting forms immediately (parallel with approvals)
+    updates.push({
+        type: 'step-start',
+        stepId: 'legal-forms',
+        status: 'in_progress',
+        delay: legalDelay
+    });
+    legalDelay += 300; // 0.3s
+    
+    // Draft Board Resolution and Consent immediately
+    updates.push({
+        type: 'document',
+        stepId: 'legal-forms',
+        documentId: 'board-resolution',
+        status: 'in_progress',
+        delay: legalDelay
+    });
+    legalDelay += 400; // 0.4s
+    
+    updates.push({
+        type: 'document',
+        stepId: 'legal-forms',
+        documentId: 'board-resolution',
+        status: 'completed',
+        docLink: 'board-resolution-signed',
+        delay: legalDelay
+    });
+    legalDelay += 300; // 0.3s
+    
+    updates.push({
+        type: 'document',
+        stepId: 'legal-forms',
+        documentId: 'consent-form',
+        status: 'in_progress',
+        delay: legalDelay
+    });
+    legalDelay += 400; // 0.4s
+    
+    updates.push({
+        type: 'document',
+        stepId: 'legal-forms',
+        documentId: 'consent-form',
+        status: 'completed',
+        docLink: 'consent-form-signed',
+        delay: legalDelay
+    });
+    legalDelay += 300; // 0.3s
+    
+    // Process first 2 substeps (draft, send)
+    legalStep.substeps.slice(0, 2).forEach((substep, idx) => {
+        if (substep.status === 'completed') return;
+        
+        updates.push({
+            type: 'substep',
+            stepId: 'legal-forms',
+            substepId: substep.id,
+            status: 'in_progress',
+            delay: legalDelay
+        });
+        legalDelay += 300; // 0.3s
+        
+        updates.push({
+            type: 'substep',
+            stepId: 'legal-forms',
+            substepId: substep.id,
+            status: 'completed',
+            time: idx === 0 ? 'Jan 9, 10:00 AM' : 'Jan 9, 10:30 AM',
+            delay: legalDelay
+        });
+        legalDelay += 300; // 0.3s
+    });
+    
+    // Regulatory form (Form 45) - wait for approval to complete first
+    const approvalCompleteDelay = approverUpdates.length > 0 
+        ? approverUpdates[approverUpdates.length - 1].delay + 300 
+        : legalDelay;
+    legalDelay = Math.max(legalDelay, approvalCompleteDelay);
+    
+    updates.push({
+        type: 'document',
+        stepId: 'legal-forms',
+        documentId: 'regulatory-form',
+        status: 'in_progress',
+        delay: legalDelay
+    });
+    legalDelay += 400; // 0.4s
+    
+    // Process remaining substeps (receive, validate)
+    legalStep.substeps.slice(2).forEach((substep, idx) => {
+        if (substep.status === 'completed') return;
+        
+        updates.push({
+            type: 'substep',
+            stepId: 'legal-forms',
+            substepId: substep.id,
+            status: 'in_progress',
+            delay: legalDelay
+        });
+        legalDelay += 300; // 0.3s
+        
+        updates.push({
+            type: 'substep',
+            stepId: 'legal-forms',
+            substepId: substep.id,
+            status: 'completed',
+            time: idx === 0 ? 'Jan 10, 2:15 PM' : 'Jan 10, 2:30 PM',
+            delay: legalDelay
+        });
+        legalDelay += 300; // 0.3s
+    });
+    
+    // Complete regulatory form
+    updates.push({
+        type: 'document',
+        stepId: 'legal-forms',
+        documentId: 'regulatory-form',
+        status: 'completed',
+        docLink: 'regulatory-form-signed',
+        delay: legalDelay
+    });
+    legalDelay += 300; // 0.3s
+    
+    // Mark legal forms complete
+    updates.push({
+        type: 'step-complete',
+        stepId: 'legal-forms',
+        status: 'completed',
+        delay: legalDelay
+    });
+    legalDelay += 300; // 0.3s
+    
+    // Send chat message about filing (use max of approval or legal delay)
+    const finalDelay = Math.max(approvalDelay, legalDelay);
+    updates.push({
+        type: 'chat-message',
+        message: 'ready-to-file',
+        delay: finalDelay
+    });
+    
+    // Mark filing step as ready (user must manually file)
+    updates.push({
+        type: 'step-start',
+        stepId: 'filing',
+        status: 'in_progress',
+        delay: finalDelay + 500
+    });
+    
+    // Sort all updates by delay to ensure correct chronological order (since we have parallel timelines)
+    updates.sort((a, b) => a.delay - b.delay);
+    
+    // Simulate progress through updates
     let updateIndex = 0;
     
     function applyUpdate() {
         if (!processRunning || processPaused || updateIndex >= updates.length) {
-            // Check if all steps are complete
-            if (updateIndex >= updates.length && processRunning) {
-                completeWorkflow();
-            }
             return;
         }
         
         const update = updates[updateIndex];
-        
-        // Find and update the substep
         const step = processSteps.find(s => s.id === update.stepId);
-        if (step) {
-            const substep = step.substeps.find(s => s.id === update.substepId);
-            if (substep) {
-                // Handle approver update
-                if (update.isApprover && substep.approvers) {
-                    const approver = substep.approvers.find(a => a.id === update.approverId);
-                    if (approver) {
-                        approver.status = update.status;
-                        approver.time = update.time;
-                        approver.vote = update.vote;
-                    }
-                } else {
-                    // Regular substep update
-                    substep.status = update.status;
-                    if (update.time) {
-                        substep.time = update.time;
+        
+        switch(update.type) {
+            case 'substep':
+                if (step) {
+                    const substep = step.substeps.find(s => s.id === update.substepId);
+                    if (substep) {
+                        substep.status = update.status;
+                        if (update.time) substep.time = update.time;
                     }
                 }
+                break;
                 
-                // Refresh the panel if it's open
-                if (chatView.classList.contains('show-right-panel')) {
-                    const panelContent = document.querySelector('.right-panel-content');
-                    panelContent.innerHTML = generateInProgressPanel();
+            case 'approver':
+                if (step) {
+                    const substep = step.substeps.find(s => s.id === update.substepId);
+                    if (substep && substep.approvers) {
+                        const approver = substep.approvers.find(a => a.id === update.approverId);
+                        if (approver) {
+                            approver.vote = update.vote;
+                            approver.time = update.time;
+                        }
+                    }
                 }
-            }
+                break;
+                
+            case 'step-complete':
+                if (step) {
+                    step.status = update.stepStatus || 'completed';
+                    if (update.voteCount) step.voteCount = update.voteCount;
+                    const substep = step.substeps.find(s => s.id === update.substepId);
+                    if (substep) {
+                        substep.status = update.substepStatus || 'completed';
+                    }
+                }
+                break;
+                
+            case 'step-start':
+                if (step) {
+                    step.status = update.status;
+                }
+                break;
+                
+            case 'document':
+                if (step && step.documents) {
+                    const doc = step.documents.find(d => d.id === update.documentId);
+                    if (doc) {
+                        doc.status = update.status;
+                        if (update.docLink) doc.docLink = update.docLink;
+                    }
+                }
+                break;
+                
+            case 'chat-message':
+                if (update.message === 'ready-to-file' && currentChatId) {
+                    const legalStep = processSteps.find(s => s.id === 'legal-forms');
+                    const filingStep = processSteps.find(s => s.id === 'filing');
+                    const filingMethod = filingStep.filingMethod === 'e-file' ? 'e-file' : 'manually file';
+                    
+                    addMessageToChat(currentChatId, 'assistant',
+                        `<div class="workflow-update">
+                            <h4 style="color: var(--color-gray-900); margin-bottom: var(--space-2);">✓ Documents Ready for Filing</h4>
+                            <p style="color: var(--color-gray-700); margin-bottom: var(--space-2);">
+                                All approvals have been received and legal documents have been signed. You're now ready to file with the regulatory body.
+                            </p>
+                            <p style="color: var(--color-gray-600); font-size: var(--text-sm);">
+                                ${filingMethod === 'e-file' 
+                                    ? 'Use the E-File button in the Process Status panel to submit Form 45 to ACRA.'
+                                    : 'Download the signed documents from the Process Status panel and file with the appropriate regulatory body.'
+                                }
+                            </p>
+                        </div>`
+                    );
+                }
+                break;
+        }
+        
+        // Refresh panel
+        if (chatView.classList.contains('show-right-panel')) {
+            const panelContent = document.querySelector('.right-panel-content');
+            panelContent.innerHTML = generateInProgressPanel();
         }
         
         updateIndex++;
         
         if (updateIndex < updates.length) {
-            setTimeout(applyUpdate, updates[updateIndex].delay);
-        } else {
-            // All updates complete
-            setTimeout(() => completeWorkflow(), 1000);
+            // Calculate relative delay between current and next update
+            const nextDelay = updates[updateIndex].delay - updates[updateIndex - 1].delay;
+            setTimeout(applyUpdate, nextDelay);
         }
     }
     
     // Start the first update
-    setTimeout(applyUpdate, updates[0].delay);
+    if (updates.length > 0) {
+        setTimeout(applyUpdate, updates[0].delay);
+    }
+}
+
+function eFileDocument() {
+    if (currentChatId) {
+        addMessageToChat(currentChatId, 'assistant',
+            `✓ Form 45 has been successfully submitted to ACRA via e-Filing. You will receive a confirmation email once the filing is processed (typically within 1-2 business days).`
+        );
+    }
+    
+    // Mark filing as complete
+    const filingStep = processSteps.find(s => s.id === 'filing');
+    if (filingStep) {
+        filingStep.status = 'completed';
+        
+        // Refresh panel
+        if (chatView.classList.contains('show-right-panel')) {
+            const panelContent = document.querySelector('.right-panel-content');
+            panelContent.innerHTML = generateInProgressPanel();
+        }
+    }
+}
+
+function downloadFilingDocuments() {
+    // Trigger download
+    const { company, appointee } = currentAppointment;
+    const filename = `Regulatory_Filing_${appointee.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+    
+    if (currentChatId) {
+        addMessageToChat(currentChatId, 'assistant',
+            `✓ Filing documents have been downloaded. Please file the signed forms with the appropriate regulatory body according to your jurisdiction's requirements.`
+        );
+    }
+    
+    // Mark filing as complete
+    const filingStep = processSteps.find(s => s.id === 'filing');
+    if (filingStep) {
+        filingStep.status = 'completed';
+        
+        // Refresh panel
+        if (chatView.classList.contains('show-right-panel')) {
+            const panelContent = document.querySelector('.right-panel-content');
+            panelContent.innerHTML = generateInProgressPanel();
+        }
+    }
 }
 
 function completeWorkflow() {
