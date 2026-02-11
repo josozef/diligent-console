@@ -1673,6 +1673,25 @@ body {
     color: var(--color-green-600);
 }
 
+.workflow-action-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    background: #fef3c7;
+    border: 1px solid #d97706;
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: #d97706;
+    animation: actionPulse 2s ease-in-out infinite;
+}
+
+@keyframes actionPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
 .panel-toggle-btn {
     width: 36px;
     height: 36px;

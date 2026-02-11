@@ -2170,6 +2170,26 @@ function updateChatHeaderActions(state) {
             </span>
         `;
         actionsContainer.style.display = 'flex';
+    } else if (state === 'action-required') {
+        // Show View Status button with Action Required indicator
+        actionsContainer.innerHTML = `
+            <button class="header-status-btn" onclick="reopenStatusPanel()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                </svg>
+                View Status
+            </button>
+            <span class="workflow-action-tag">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                Action Needed
+            </span>
+        `;
+        actionsContainer.style.display = 'flex';
     } else if (state === 'process-complete') {
         // Show View Summary button with Completed indicator
         actionsContainer.innerHTML = `
@@ -3732,6 +3752,10 @@ function simulateLiveUpdates() {
             case 'step-start':
                 if (step) {
                     step.status = update.status;
+                    // When filing step becomes active, update header to show action needed
+                    if (step.id === 'filing' && update.status === 'in_progress') {
+                        updateChatHeaderActions('action-required');
+                    }
                 }
                 break;
                 
