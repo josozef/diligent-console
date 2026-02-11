@@ -28,11 +28,17 @@ const sendBtn = document.getElementById('sendBtn');
 const responseArea = document.getElementById('responseArea');
 const responseContent = document.getElementById('responseContent');
 
-// Quick action buttons (TEMPORARILY HIDDEN)
+// Quick action buttons (TEMPORARILY HIDDEN - old set)
 // const chatsBtn = document.getElementById('chatsBtn');
 // const appointBtn = document.getElementById('appointBtn');
 // const openAppBtn = document.getElementById('openAppBtn');
 // const appDropdown = document.getElementById('appDropdown');
+
+// Hero quick action buttons (new set)
+const heroAppointBtn = document.getElementById('heroAppointBtn');
+const heroOpenAppBtn = document.getElementById('heroOpenAppBtn');
+const heroAppDropdown = document.getElementById('heroAppDropdown');
+const heroAssistToolsBtn = document.getElementById('heroAssistToolsBtn');
 
 // Navigation rail buttons
 // Navigation - Left rail removed
@@ -101,52 +107,58 @@ document.querySelectorAll('.suggestion-chip').forEach(chip => {
     });
 });
 
-// Quick action button handlers (TEMPORARILY HIDDEN)
+// Quick action button handlers (TEMPORARILY HIDDEN - old set)
 /*
-chatsBtn.addEventListener('click', function() {
-    // Transition to chat view showing recent chats
-    transitionToChatView();
-});
-
-appointBtn.addEventListener('click', function() {
-    setPromptAndSend('Appoint a Director');
-});
-
-openAppBtn.addEventListener('click', function(e) {
-    e.stopPropagation();
-    // Toggle dropdown
-    const isVisible = appDropdown.style.display === 'block';
-    appDropdown.style.display = isVisible ? 'none' : 'block';
-});
-
-// App dropdown item handlers
-document.querySelectorAll('.app-dropdown-item').forEach(item => {
-    item.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const appName = this.textContent;
-        appDropdown.style.display = 'none';
-        setPromptAndSend(`Open ${appName}`);
-    });
-});
-
-// Close dropdown when clicking outside
-document.addEventListener('click', function(e) {
-    if (appDropdown && !openAppBtn.contains(e.target) && !appDropdown.contains(e.target)) {
-        appDropdown.style.display = 'none';
-    }
-});
+chatsBtn.addEventListener('click', function() { transitionToChatView(); });
+appointBtn.addEventListener('click', function() { setPromptAndSend('Appoint a Director'); });
+openAppBtn.addEventListener('click', function(e) { ... });
 */
 
-// What Can I Do toggle
+// Hero quick action button handlers
+if (heroAppointBtn) {
+    heroAppointBtn.addEventListener('click', function() {
+        setPromptAndSend('Appoint a Director');
+    });
+}
+
+if (heroOpenAppBtn) {
+    heroOpenAppBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const isVisible = heroAppDropdown && heroAppDropdown.style.display === 'block';
+        if (heroAppDropdown) heroAppDropdown.style.display = isVisible ? 'none' : 'block';
+    });
+}
+
+if (heroAppDropdown) {
+    document.querySelectorAll('.hero-app-dropdown-item').forEach(item => {
+        item.addEventListener('click', function() {
+            heroAppDropdown.style.display = 'none';
+            // For demo purposes, these don't navigate anywhere
+        });
+    });
+}
+
+// Close hero app dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.hero-quick-btn-wrapper') && heroAppDropdown) {
+        heroAppDropdown.style.display = 'none';
+    }
+});
+
+// View Assist Tools button (replaces old whatCanIDoBtn link)
+if (heroAssistToolsBtn && assistCapabilities) {
+    heroAssistToolsBtn.addEventListener('click', function() {
+        const isVisible = assistCapabilities.style.display === 'block';
+        assistCapabilities.style.display = isVisible ? 'none' : 'block';
+    });
+}
+
+// What Can I Do toggle (legacy - kept for backward compatibility)
 if (whatCanIDoBtn && assistCapabilities) {
     whatCanIDoBtn.addEventListener('click', function(e) {
         e.preventDefault();
         const isVisible = assistCapabilities.style.display === 'block';
-        if (isVisible) {
-            assistCapabilities.style.display = 'none';
-        } else {
-            assistCapabilities.style.display = 'block';
-        }
+        assistCapabilities.style.display = isVisible ? 'none' : 'block';
     });
 }
 
@@ -569,9 +581,62 @@ function appendMessageToThread(message) {
             }, 50);
         }, 100);
     }
+    if (message.content.includes('committeeSelect')) {
+        setTimeout(() => {
+            initializeCommitteeSelector();
+            setTimeout(() => {
+                chatThread.scrollTop = chatThread.scrollHeight;
+            }, 50);
+        }, 100);
+    }
     
     // Scroll to bottom
     chatThread.scrollTop = chatThread.scrollHeight;
+}
+
+// Disable all interactive buttons/inputs in the most recent message container
+// Call this after a user has interacted with a workflow step in chat
+function disableChatStepButtons(containerSelector) {
+    const container = containerSelector 
+        ? document.querySelector(containerSelector)
+        : null;
+    
+    if (!container) {
+        // Fallback: disable buttons in the last few assistant messages
+        const messages = chatThread.querySelectorAll('.message.assistant .message-text');
+        if (messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+            disableButtonsInElement(lastMsg);
+        }
+        return;
+    }
+    disableButtonsInElement(container);
+}
+
+function disableButtonsInElement(el) {
+    el.querySelectorAll('button:not(.header-preview-btn):not(.header-status-btn)').forEach(btn => {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+        btn.style.pointerEvents = 'none';
+    });
+    el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.disabled = true;
+        cb.style.cursor = 'not-allowed';
+    });
+    el.querySelectorAll('select').forEach(sel => {
+        sel.disabled = true;
+        sel.style.cursor = 'not-allowed';
+    });
+}
+
+// Disable all interactive elements in previous assistant messages (not the current one)
+function disablePreviousChatInteractions() {
+    const messages = chatThread.querySelectorAll('.message.assistant .message-text');
+    // Disable all but the last message
+    for (let i = 0; i < messages.length - 1; i++) {
+        disableButtonsInElement(messages[i]);
+    }
 }
 
 function clearChatThread() {
@@ -1411,21 +1476,6 @@ function generateAppointDirectorForm(appointmentType = 'replace', savedState = {
                     <button type="button" class="consent-btn" data-value="no" id="consentNoBtn">No</button>
                 </div>
                 <input type="hidden" id="hasConsentToAct" value="" />
-                <div id="consentDownload" style="display: none; margin-top: var(--space-3);">
-                    <div style="padding: var(--space-3); background: var(--color-gray-50); border-radius: var(--radius-md); border: 1px solid var(--color-gray-200);">
-                        <p style="font-size: var(--text-xs); color: var(--color-gray-600); margin-bottom: var(--space-2);">
-                            A Consent to Act is required for this appointment. Download the template below and have the appointee sign it.
-                        </p>
-                        <button type="button" class="filing-action-btn filing-action-secondary" onclick="downloadConsentTemplate()" style="font-size: var(--text-xs);">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
-                            Download Consent to Act Template
-                        </button>
-                    </div>
-                </div>
             </div>
 
             <div class="form-actions">
@@ -1589,7 +1639,6 @@ function initializeAppointDirectorForm() {
     // Wire up Consent to Act buttons
     const consentYesBtn = form.querySelector('#consentYesBtn');
     const consentNoBtn = form.querySelector('#consentNoBtn');
-    const consentDownload = form.querySelector('#consentDownload');
     
     if (consentYesBtn) {
         consentYesBtn.addEventListener('click', (e) => {
@@ -1598,7 +1647,6 @@ function initializeAppointDirectorForm() {
             setHiddenValue('hasConsentToAct', 'yes');
             consentYesBtn.classList.add('consent-btn-active');
             consentNoBtn.classList.remove('consent-btn-active');
-            if (consentDownload) consentDownload.style.display = 'none';
             checkFormCompletion();
         });
     }
@@ -1610,7 +1658,6 @@ function initializeAppointDirectorForm() {
             setHiddenValue('hasConsentToAct', 'no');
             consentNoBtn.classList.add('consent-btn-active');
             consentYesBtn.classList.remove('consent-btn-active');
-            if (consentDownload) consentDownload.style.display = 'block';
             checkFormCompletion();
         });
     }
@@ -2297,6 +2344,12 @@ function generateAppointmentPanelContent() {
             <!-- Legal Forms -->
             <section class="panel-section-flush" id="documentsSection">
                 <h4 class="panel-group-label">Legal Forms</h4>
+                <div class="panel-group-body" style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-gray-100);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: var(--text-xs);">
+                        <span style="color: var(--color-gray-600);">Consent to Act</span>
+                        <span style="font-weight: 500;">${hasConsentToAct === false ? '<span style="color: var(--color-gray-500);">No</span>' : '<span style="color: var(--color-green-700);">Yes</span>'}</span>
+                    </div>
+                </div>
                 <div class="panel-group-body" id="documentsEmptyState">
                     <span class="empty-inline">Pending review</span>
                 </div>
@@ -2318,7 +2371,7 @@ function generateAppointmentPanelContent() {
                         <div class="wf-timeline-marker"></div>
                         <div class="wf-timeline-body">
                             <div class="wf-timeline-title">Legal Forms</div>
-                            <div class="wf-timeline-desc">Draft and send Board Resolution${hasConsentToAct === false ? ', Consent to Act,' : ''} and ${company.location === 'Singapore' ? 'Form 45' : 'regulatory forms'} to ${appointee.name} for signature.</div>
+                            <div class="wf-timeline-desc">Draft and send Board Resolution and ${company.location === 'Singapore' ? 'Form 45' : 'regulatory forms'} to ${appointee.name} for signature.</div>
                         </div>
                     </div>
                     <div class="wf-timeline-item">
@@ -2331,12 +2384,19 @@ function generateAppointmentPanelContent() {
                             }</div>
                         </div>
                     </div>
+                    <div class="wf-timeline-item">
+                        <div class="wf-timeline-marker"></div>
+                        <div class="wf-timeline-body">
+                            <div class="wf-timeline-title">Update Entities</div>
+                            <div class="wf-timeline-desc">Update entity records in the system to reflect the ${isReplacement ? 'director change' : 'new appointment'}.</div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
             <!-- Action Section -->
             <section class="panel-section-flush panel-actions" id="panelActions">
-                <button class="panel-btn-secondary" onclick="closeAppointmentPanel()">Cancel</button>
+                <!-- Start Agent button will appear when approvers and documents are confirmed -->
             </section>
         </div>
     `;
@@ -2348,8 +2408,85 @@ function initializeAppointmentPanel() {
     setTimeout(() => {
         if (currentChatId) {
             addMessageToChat(currentChatId, 'assistant', generateApproverSelectionUI());
+            // Initialize the committee selector after it's added to the DOM
+            setTimeout(() => initializeCommitteeSelector(), 100);
         }
     }, 500);
+}
+
+// Committee data with members
+const boardCommittees = {
+    'nomination': {
+        name: 'Nomination Committee',
+        members: [
+            { value: 'robert-johnson', name: 'Robert Johnson', initials: 'RJ', role: 'Committee Chair' },
+            { value: 'margaret-sullivan', name: 'Margaret Sullivan', initials: 'MS', role: 'Chief Executive Officer' },
+            { value: 'linda-williams', name: 'Linda Williams', initials: 'LW', role: 'Independent Director' },
+            { value: 'david-martinez', name: 'David Martinez', initials: 'DM', role: 'Independent Director' },
+            { value: 'james-davidson', name: 'James Davidson', initials: 'JD', role: 'Lead Independent Director', disabled: true, disabledReason: 'Missing a saved signature template' }
+        ]
+    },
+    'audit': {
+        name: 'Audit Committee',
+        members: [
+            { value: 'linda-williams', name: 'Linda Williams', initials: 'LW', role: 'Committee Chair' },
+            { value: 'thomas-chen', name: 'Thomas Chen', initials: 'TC', role: 'Independent Director' },
+            { value: 'sarah-patel', name: 'Sarah Patel', initials: 'SP', role: 'Independent Director' },
+            { value: 'david-martinez', name: 'David Martinez', initials: 'DM', role: 'Independent Director' }
+        ]
+    },
+    'compensation': {
+        name: 'Compensation Committee',
+        members: [
+            { value: 'david-martinez', name: 'David Martinez', initials: 'DM', role: 'Committee Chair' },
+            { value: 'robert-johnson', name: 'Robert Johnson', initials: 'RJ', role: 'Board Chair' },
+            { value: 'patricia-walsh', name: 'Patricia Walsh', initials: 'PW', role: 'Independent Director' },
+            { value: 'sarah-patel', name: 'Sarah Patel', initials: 'SP', role: 'Independent Director' },
+            { value: 'margaret-sullivan', name: 'Margaret Sullivan', initials: 'MS', role: 'Chief Executive Officer' }
+        ]
+    },
+    'governance': {
+        name: 'Governance Committee',
+        members: [
+            { value: 'margaret-sullivan', name: 'Margaret Sullivan', initials: 'MS', role: 'Committee Chair' },
+            { value: 'robert-johnson', name: 'Robert Johnson', initials: 'RJ', role: 'Board Chair' },
+            { value: 'thomas-chen', name: 'Thomas Chen', initials: 'TC', role: 'Independent Director' },
+            { value: 'patricia-walsh', name: 'Patricia Walsh', initials: 'PW', role: 'Independent Director' },
+            { value: 'linda-williams', name: 'Linda Williams', initials: 'LW', role: 'Independent Director' },
+            { value: 'james-davidson', name: 'James Davidson', initials: 'JD', role: 'Lead Independent Director', disabled: true, disabledReason: 'Missing a saved signature template' }
+        ]
+    }
+};
+
+function generateCommitteeMembersList(committeeId) {
+    const committee = boardCommittees[committeeId];
+    if (!committee) return '';
+    
+    return committee.members.map(member => {
+        if (member.disabled) {
+            return `
+                <div style="display: flex; flex-direction: column; gap: var(--space-1);">
+                    <label style="display: flex; align-items: center; gap: var(--space-2); cursor: not-allowed; opacity: 0.5;">
+                        <input type="checkbox" name="approver" value="${member.value}" data-name="${member.name}" data-initials="${member.initials}" data-role="${member.role}" disabled style="cursor: not-allowed;">
+                        <span style="flex: 1; font-size: var(--text-sm); color: var(--color-gray-600);">
+                            <strong>${member.name}</strong> &mdash; ${member.role}
+                        </span>
+                    </label>
+                    <div style="margin-left: var(--space-6); font-size: var(--text-xs); color: var(--color-gray-500); font-style: italic;">
+                        ${member.disabledReason}
+                    </div>
+                </div>
+            `;
+        }
+        return `
+            <label style="display: flex; align-items: center; gap: var(--space-2); cursor: pointer;">
+                <input type="checkbox" name="approver" value="${member.value}" data-name="${member.name}" data-initials="${member.initials}" data-role="${member.role}" style="cursor: pointer;">
+                <span style="flex: 1; font-size: var(--text-sm); color: var(--color-gray-900);">
+                    <strong>${member.name}</strong> &mdash; ${member.role}
+                </span>
+            </label>
+        `;
+    }).join('');
 }
 
 // Generate approver selection UI in chat
@@ -2357,62 +2494,79 @@ function generateApproverSelectionUI() {
     return `
         <h4 style="margin-bottom: var(--space-3); color: var(--color-gray-900);">Select Approvers</h4>
         <p style="margin-bottom: var(--space-4); line-height: var(--leading-normal); color: var(--color-gray-700);">
-            Please select the board members who need to approve this director appointment:
+            Select a board committee and choose the members who need to approve this director appointment.
         </p>
         
         <form id="approverSelectionForm" style="background: var(--color-gray-50); padding: var(--space-4); border-radius: var(--radius-lg); margin-bottom: var(--space-3);">
-            <div style="display: flex; flex-direction: column; gap: var(--space-3);">
-                <label style="display: flex; align-items: center; gap: var(--space-2); cursor: pointer;">
-                    <input type="checkbox" name="approver" value="robert-johnson" data-name="Robert Johnson" data-initials="RJ" data-role="Board Chair" style="cursor: pointer;">
-                    <span style="flex: 1; font-size: var(--text-sm); color: var(--color-gray-900);">
-                        <strong>Robert Johnson</strong> &mdash; Board Chair
-                    </span>
-                </label>
-                
-                <label style="display: flex; align-items: center; gap: var(--space-2); cursor: pointer;">
-                    <input type="checkbox" name="approver" value="margaret-sullivan" data-name="Margaret Sullivan" data-initials="MS" data-role="Chief Executive Officer" style="cursor: pointer;">
-                    <span style="flex: 1; font-size: var(--text-sm); color: var(--color-gray-900);">
-                        <strong>Margaret Sullivan</strong> &mdash; Chief Executive Officer
-                    </span>
-                </label>
-                
-                <div style="display: flex; flex-direction: column; gap: var(--space-1);">
-                    <label style="display: flex; align-items: center; gap: var(--space-2); cursor: not-allowed; opacity: 0.5;">
-                        <input type="checkbox" name="approver" value="james-davidson" data-name="James Davidson" data-initials="JD" data-role="Lead Independent Director" disabled style="cursor: not-allowed;">
-                        <span style="flex: 1; font-size: var(--text-sm); color: var(--color-gray-600);">
-                            <strong>James Davidson</strong> &mdash; Lead Independent Director
-                        </span>
-                    </label>
-                    <div style="margin-left: var(--space-6); font-size: var(--text-xs); color: var(--color-gray-500); font-style: italic;">
-                        Missing a saved signature template
-                    </div>
-                </div>
-                
-                <label style="display: flex; align-items: center; gap: var(--space-2); cursor: pointer;">
-                    <input type="checkbox" name="approver" value="linda-williams" data-name="Linda Williams" data-initials="LW" data-role="Audit Committee Chair" style="cursor: pointer;">
-                    <span style="flex: 1; font-size: var(--text-sm); color: var(--color-gray-900);">
-                        <strong>Linda Williams</strong> &mdash; Audit Committee Chair
-                    </span>
-                </label>
-                
-                <label style="display: flex; align-items: center; gap: var(--space-2); cursor: pointer;">
-                    <input type="checkbox" name="approver" value="david-martinez" data-name="David Martinez" data-initials="DM" data-role="Compensation Committee Chair" style="cursor: pointer;">
-                    <span style="flex: 1; font-size: var(--text-sm); color: var(--color-gray-900);">
-                        <strong>David Martinez</strong> &mdash; Compensation Committee Chair
-                    </span>
-                </label>
+            <div style="margin-bottom: var(--space-3);">
+                <label style="display: block; font-size: var(--text-xs); font-weight: 600; color: var(--color-gray-500); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-2);">Committee</label>
+                <select id="committeeSelect" style="width: 100%; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); font-family: var(--font-sans); border: 1px solid var(--color-gray-300); border-radius: var(--radius-md); background: var(--color-white); color: var(--color-gray-900); cursor: pointer;">
+                    <option value="">Select a committee...</option>
+                    <option value="nomination">Nomination Committee</option>
+                    <option value="audit">Audit Committee</option>
+                    <option value="compensation">Compensation Committee</option>
+                    <option value="governance">Governance Committee</option>
+                </select>
             </div>
             
-            <button type="button" class="panel-btn-primary" onclick="confirmApprovers()" style="margin-top: var(--space-4); width: 100%;">
+            <div id="committeeMembersList" style="display: none;">
+                <label style="display: block; font-size: var(--text-xs); font-weight: 600; color: var(--color-gray-500); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-2);">Members</label>
+                <div id="committeeMembersCheckboxes" style="display: flex; flex-direction: column; gap: var(--space-3);">
+                </div>
+            </div>
+            
+            <button type="button" class="panel-btn-primary" id="confirmApproversBtn" onclick="confirmApprovers()" style="margin-top: var(--space-4); width: 100%;" disabled>
                 Confirm Approvers
             </button>
         </form>
     `;
 }
 
+// Initialize committee selector after it's added to chat
+function initializeCommitteeSelector() {
+    const forms = document.querySelectorAll('#approverSelectionForm');
+    const form = forms[forms.length - 1];
+    if (!form) return;
+    
+    const select = form.querySelector('#committeeSelect');
+    const membersList = form.querySelector('#committeeMembersList');
+    const membersCheckboxes = form.querySelector('#committeeMembersCheckboxes');
+    const confirmBtn = form.querySelector('#confirmApproversBtn');
+    
+    if (select) {
+        select.addEventListener('change', function() {
+            const committeeId = this.value;
+            if (committeeId && boardCommittees[committeeId]) {
+                membersCheckboxes.innerHTML = generateCommitteeMembersList(committeeId);
+                membersList.style.display = 'block';
+                
+                // Store selected committee
+                window.appointmentWorkflowState.selectedCommittee = boardCommittees[committeeId].name;
+                
+                // Wire up checkbox change events to enable/disable confirm button
+                const checkboxes = membersCheckboxes.querySelectorAll('input[name="approver"]');
+                checkboxes.forEach(cb => {
+                    cb.addEventListener('change', function() {
+                        const checked = membersCheckboxes.querySelectorAll('input[name="approver"]:checked');
+                        confirmBtn.disabled = checked.length === 0;
+                    });
+                });
+                
+                // Reset confirm button
+                confirmBtn.disabled = true;
+            } else {
+                membersList.style.display = 'none';
+                membersCheckboxes.innerHTML = '';
+                confirmBtn.disabled = true;
+            }
+        });
+    }
+}
+
 // Handle approver confirmation
 function confirmApprovers() {
-    const form = document.getElementById('approverSelectionForm');
+    const forms = document.querySelectorAll('#approverSelectionForm');
+    const form = forms[forms.length - 1];
     if (!form) return;
     
     const checkboxes = form.querySelectorAll('input[name="approver"]:checked');
@@ -2431,7 +2585,10 @@ function confirmApprovers() {
         return;
     }
     
-    // Store selected approvers
+    // Disable the approver selection form buttons
+    disableButtonsInElement(form);
+    
+    // Store selected approvers (also store committee name)
     window.appointmentWorkflowState.selectedApprovers = selectedApprovers;
     
     // Add to preview panel
@@ -2456,11 +2613,8 @@ function confirmApprovers() {
 
 // Generate document review UI in chat
 function generateDocumentReviewUI() {
-    const { company, hasConsentToAct } = window.selectedAppointment || {};
+    const { company } = window.selectedAppointment || {};
     const regulatoryFormName = company && company.location === 'Singapore' ? 'Form 45' : 'Regulatory Filing Form';
-    
-    // Only show Consent to Act if user said they don't have one (we need to generate it)
-    const showConsent = hasConsentToAct === false;
     
     return `
         <h4 style="margin-bottom: var(--space-3); color: var(--color-gray-900);">Review Documents</h4>
@@ -2477,15 +2631,6 @@ function generateDocumentReviewUI() {
                     </svg>
                     <span>Board Resolution</span>
                 </li>
-                ${showConsent ? `
-                <li style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-gray-700);">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                    </svg>
-                    <span>Consent to Act as Director</span>
-                </li>
-                ` : ''}
                 <li style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-gray-700);">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -2504,18 +2649,27 @@ function generateDocumentReviewUI() {
 
 // Handle document review confirmation
 function confirmDocumentsReviewed() {
+    // Disable the document review buttons
+    disablePreviousChatInteractions();
+    
     // Mark documents as reviewed
     window.appointmentWorkflowState.documentsReviewed = true;
     
-    // Enable Start Process button if both conditions are met
+    // Enable Start Agent button if both conditions are met
     updateStartProcessButton();
     
-    // Acknowledge in chat
+    // Acknowledge in chat with Start Agent button
     if (currentChatId) {
         addMessageToChat(currentChatId, 'assistant', 
             `<p style="color: var(--color-gray-700); margin-bottom: var(--space-3);">
-                <strong>Documents confirmed.</strong> You're now ready to start the appointment process. Click "Start Process" in the preview panel when you're ready to proceed.
-            </p>`
+                <strong>Documents confirmed.</strong> Everything looks good. When you're ready, start the agent to begin the appointment workflow.
+            </p>
+            <button class="panel-btn-primary" onclick="startAppointmentWorkflow()" style="margin-top: var(--space-2);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                Start Agent
+            </button>`
         );
     }
 }
@@ -2546,7 +2700,7 @@ function addApproversToPanel(approvers) {
 
 // New function to add documents section to panel
 function addDocumentsToPanel() {
-    const { appointee, company, hasConsentToAct } = window.selectedAppointment || {};
+    const { appointee, company } = window.selectedAppointment || {};
     const emptyState = document.getElementById('documentsEmptyState');
     const documentsList = document.getElementById('documentsList');
     if (!emptyState || !documentsList) return;
@@ -2554,10 +2708,7 @@ function addDocumentsToPanel() {
     // Hide empty state
     emptyState.style.display = 'none';
     
-    // Only show Consent to Act if user said they don't have one
-    const showConsent = hasConsentToAct === false;
-    
-    // Populate and show documents list
+    // Populate and show documents list (Consent to Act removed - just recorded as yes/no)
     documentsList.innerHTML = `
         <div class="doc-compact-item">
             <div class="doc-compact-info">
@@ -2569,18 +2720,6 @@ function addDocumentsToPanel() {
             </div>
             <button class="doc-review-btn" onclick="previewDocument('board-resolution')">Review</button>
         </div>
-        ${showConsent ? `
-        <div class="doc-compact-item">
-            <div class="doc-compact-info">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="doc-compact-icon">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-                <span class="doc-compact-name">Consent to Act</span>
-            </div>
-            <button class="doc-review-btn" onclick="previewDocument('consent-form')">Review</button>
-        </div>
-        ` : ''}
         <div class="doc-compact-item">
             <div class="doc-compact-info">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="doc-compact-icon">
@@ -2595,7 +2734,7 @@ function addDocumentsToPanel() {
     documentsList.style.display = 'block';
 }
 
-// Update Start Process button visibility
+// Update Start Agent button visibility
 function updateStartProcessButton() {
     const actionsSection = document.getElementById('panelActions');
     if (!actionsSection) return;
@@ -2604,8 +2743,12 @@ function updateStartProcessButton() {
     
     if (state.approversSelected && state.documentsReviewed) {
         actionsSection.innerHTML = `
-            <button class="panel-btn-secondary" onclick="closeAppointmentPanel()">Cancel</button>
-            <button class="panel-btn-primary" onclick="startAppointmentWorkflow()">Start Process</button>
+            <button class="panel-btn-primary" onclick="startAppointmentWorkflow()" style="width: 100%;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                Start Agent
+            </button>
         `;
         
         // Update header to show "Ready" tag
@@ -2859,6 +3002,20 @@ function initializeReplacementAppointeeSearch() {
 }
 
 function startAppointmentWorkflow() {
+    // Disable the Start Agent button that was just clicked
+    if (event && event.target) {
+        const btn = event.target.closest('button');
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+            btn.style.pointerEvents = 'none';
+        }
+    }
+    
+    // Disable all interactive buttons in previous chat messages
+    disablePreviousChatInteractions();
+    
     // Initialize process state
     processRunning = true;
     processPaused = false;
@@ -2906,7 +3063,10 @@ function startAppointmentWorkflow() {
         'Margaret Sullivan': 'approval-sullivan',
         'James Davidson': 'approval-davidson',
         'Linda Williams': 'approval-williams',
-        'David Martinez': 'approval-martinez'
+        'David Martinez': 'approval-martinez',
+        'Thomas Chen': 'approval-chen',
+        'Sarah Patel': 'approval-patel',
+        'Patricia Walsh': 'approval-walsh'
     };
     
     const approvers = selectedApprovers.map(a => ({
@@ -2944,7 +3104,6 @@ function startAppointmentWorkflow() {
             status: 'pending',
             documents: [
                 { id: 'board-resolution', name: 'Board Resolution', status: 'pending', docLink: null },
-                ...(!currentAppointment.hasConsentToAct ? [{ id: 'consent-form', name: 'Consent to Act', status: 'pending', docLink: null }] : []),
                 { id: 'regulatory-form', name: company.location === 'Singapore' ? 'Form 45' : 'Regulatory Form', status: 'pending', docLink: null }
             ],
             substeps: [
@@ -2963,6 +3122,12 @@ function startAppointmentWorkflow() {
                 ? 'File Form 45 with ACRA using the e-Filing system below.'
                 : 'Download the signed regulatory form and file with the appropriate regulatory body.',
             substeps: []
+        },
+        {
+            id: 'entities',
+            name: 'Update Entities',
+            status: 'pending',
+            substeps: entitySubsteps
         }
     ];
     
@@ -3017,6 +3182,7 @@ function generateInProgressPanel() {
     const approvalStep = processSteps.find(s => s.id === 'approval');
     const legalStep = processSteps.find(s => s.id === 'legal-forms');
     const filingStep = processSteps.find(s => s.id === 'filing');
+    const entitiesStep = processSteps.find(s => s.id === 'entities');
     
     return `
         <div class="in-progress-panel">
@@ -3054,6 +3220,17 @@ function generateInProgressPanel() {
                             : ''
                     }
                 </div>
+                <div class="stepper-connector ${entitiesStep.status !== 'pending' ? 'active' : ''}"></div>
+                <div class="stepper-step ${entitiesStep.status}">
+                    <div class="stepper-dot">${getStepperIcon(entitiesStep.status)}</div>
+                    <div class="stepper-label">Entities</div>
+                    ${entitiesStep.status === 'completed' 
+                        ? `<div class="stepper-meta">Updated</div>`
+                        : entitiesStep.status === 'in_progress'
+                            ? `<div class="stepper-meta stepper-meta-active">Updating</div>`
+                            : ''
+                    }
+                </div>
             </div>
             
             <!-- Detail Sections -->
@@ -3061,6 +3238,7 @@ function generateInProgressPanel() {
                 ${generateApprovalSection(approvalStep)}
                 ${generateLegalFormsSection(legalStep)}
                 ${generateFilingSection(filingStep)}
+                ${generateEntitiesSection(entitiesStep)}
             </div>
         </div>
     `;
@@ -3207,31 +3385,40 @@ function generateFilingSection(step) {
             
             ${step.status === 'completed' 
                 ? `<div class="filing-card">
-                    <p class="filing-card-text" style="margin-bottom: 0;">Documents have been filed. The appointment process is complete.</p>
+                    <p class="filing-card-text" style="margin-bottom: 0;">Documents have been filed.</p>
                   </div>`
                 : `<div class="filing-card">
-                    <p class="filing-card-text">File the signed documents with the regulatory body. You can e-File directly through ACRA or download the documents to file manually.</p>
-                    
-                    <div class="filing-actions">
-                        <button class="filing-action-btn filing-action-primary" onclick="eFileDocument()">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="17 8 12 3 7 8"></polyline>
-                                <line x1="12" y1="3" x2="12" y2="15"></line>
-                            </svg>
-                            E-File with ACRA
-                        </button>
-                        <button class="filing-action-btn filing-action-secondary" onclick="downloadFilingDocuments()">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
-                            Download &amp; File Manually
-                        </button>
-                    </div>
+                    <p class="filing-card-text">Signed documents are ready to file. Use the filing options in the chat to e-File with ACRA or download documents to file manually.</p>
                   </div>`
             }
+        </section>
+    `;
+}
+
+function generateEntitiesSection(step) {
+    if (step.status === 'pending') return '';
+    
+    return `
+        <section class="status-detail-section">
+            <div class="detail-section-header">
+                <h4 class="detail-section-title">Update Entities</h4>
+                ${step.status === 'completed' 
+                    ? `<span class="detail-section-badge badge-complete">Updated</span>`
+                    : `<span class="detail-section-badge badge-action">Updating</span>`
+                }
+            </div>
+            
+            ${step.substeps.length > 0 ? `
+            <div class="status-substeps">
+                ${step.substeps.map(substep => `
+                    <div class="status-substep-row ${substep.status}">
+                        ${getStatusIcon(substep.status)}
+                        <span class="status-substep-label">${substep.name}</span>
+                        ${substep.time ? `<span class="status-substep-time">${substep.time}</span>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+            ` : ''}
         </section>
     `;
 }
@@ -3579,27 +3766,7 @@ function simulateLiveUpdates() {
     });
     legalDelay += 300; // 0.3s
     
-    // Only include Consent to Act if user doesn't have one
-    if (!currentAppointment.hasConsentToAct) {
-        updates.push({
-            type: 'document',
-            stepId: 'legal-forms',
-            documentId: 'consent-form',
-            status: 'in_progress',
-            delay: legalDelay
-        });
-        legalDelay += 400; // 0.4s
-        
-        updates.push({
-            type: 'document',
-            stepId: 'legal-forms',
-            documentId: 'consent-form',
-            status: 'completed',
-            docLink: 'consent-form-signed',
-            delay: legalDelay
-        });
-        legalDelay += 300; // 0.3s
-    }
+    // Consent to Act removed from automated workflow - just recorded as yes/no
     
     // Process first 2 substeps (draft, send)
     legalStep.substeps.slice(0, 2).forEach((substep, idx) => {
@@ -3778,15 +3945,29 @@ function simulateLiveUpdates() {
                     addMessageToChat(currentChatId, 'assistant',
                         `<div class="workflow-update">
                             <h4 style="color: var(--color-gray-900); margin-bottom: var(--space-2);">✓ Documents Ready for Filing</h4>
-                            <p style="color: var(--color-gray-700); margin-bottom: var(--space-2);">
+                            <p style="color: var(--color-gray-700); margin-bottom: var(--space-3);">
                                 All approvals have been received and legal documents have been signed. You're now ready to file with the regulatory body.
                             </p>
-                            <p style="color: var(--color-gray-600); font-size: var(--text-sm);">
-                                ${filingMethod === 'e-file' 
-                                    ? 'Use the E-File button in the Process Status panel to submit Form 45 to ACRA.'
-                                    : 'Download the signed documents from the Process Status panel and file with the appropriate regulatory body.'
-                                }
-                            </p>
+                            <div class="filing-actions" style="margin-top: var(--space-3);">
+                                ${filingMethod === 'e-file' ? `
+                                <button class="filing-action-btn filing-action-primary" onclick="eFileDocument()">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                    E-File with ACRA
+                                </button>
+                                ` : ''}
+                                <button class="filing-action-btn filing-action-secondary" onclick="downloadFilingDocuments()">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                    Download &amp; File Manually
+                                </button>
+                            </div>
                         </div>`
                     );
                 }
@@ -3815,25 +3996,43 @@ function simulateLiveUpdates() {
 }
 
 function eFileDocument() {
+    // Disable filing buttons in chat
+    disablePreviousChatInteractions();
+    
     // Mark filing as complete
     const filingStep = processSteps.find(s => s.id === 'filing');
     if (filingStep) {
         filingStep.status = 'completed';
     }
     
-    // Complete the entire workflow
-    completeWorkflow('e-file');
+    // Refresh panel to show filing complete
+    if (chatView.classList.contains('show-right-panel')) {
+        const panelContent = document.querySelector('.right-panel-content');
+        panelContent.innerHTML = generateInProgressPanel();
+    }
+    
+    // Start entities update
+    startEntitiesUpdate('e-file');
 }
 
 function downloadFilingDocuments() {
+    // Disable filing buttons in chat
+    disablePreviousChatInteractions();
+    
     // Mark filing as complete
     const filingStep = processSteps.find(s => s.id === 'filing');
     if (filingStep) {
         filingStep.status = 'completed';
     }
     
-    // Complete the entire workflow
-    completeWorkflow('download');
+    // Refresh panel to show filing complete
+    if (chatView.classList.contains('show-right-panel')) {
+        const panelContent = document.querySelector('.right-panel-content');
+        panelContent.innerHTML = generateInProgressPanel();
+    }
+    
+    // Start entities update
+    startEntitiesUpdate('download');
 }
 
 function downloadConsentTemplate() {
@@ -3850,6 +4049,77 @@ function downloadConsentTemplate() {
         btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Downloaded`;
         setTimeout(() => { btn.innerHTML = originalText; }, 2000);
     }
+}
+
+function startEntitiesUpdate(filingMethod) {
+    const entitiesStep = processSteps.find(s => s.id === 'entities');
+    if (!entitiesStep) return;
+    
+    // Mark entities as in progress
+    entitiesStep.status = 'in_progress';
+    
+    // Refresh panel
+    if (chatView.classList.contains('show-right-panel')) {
+        const panelContent = document.querySelector('.right-panel-content');
+        panelContent.innerHTML = generateInProgressPanel();
+    }
+    
+    // Animate entity updates
+    let delay = 500;
+    entitiesStep.substeps.forEach((substep, idx) => {
+        setTimeout(() => {
+            substep.status = 'in_progress';
+            if (chatView.classList.contains('show-right-panel')) {
+                const panelContent = document.querySelector('.right-panel-content');
+                panelContent.innerHTML = generateInProgressPanel();
+            }
+        }, delay);
+        delay += 800;
+        
+        setTimeout(() => {
+            substep.status = 'completed';
+            substep.time = new Date().toLocaleString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+            });
+            if (chatView.classList.contains('show-right-panel')) {
+                const panelContent = document.querySelector('.right-panel-content');
+                panelContent.innerHTML = generateInProgressPanel();
+            }
+            
+            // If this is the last substep, complete the entities step
+            if (idx === entitiesStep.substeps.length - 1) {
+                setTimeout(() => {
+                    entitiesStep.status = 'completed';
+                    
+                    // Add chat message about entities update
+                    if (currentChatId) {
+                        const entityRecords = entitiesStep.substeps.map(s => 
+                            s.name.replace('Record ', '').replace(' resignation', '').replace(' appointment', '')
+                        ).join(' and ');
+                        
+                        addMessageToChat(currentChatId, 'assistant',
+                            `<div class="workflow-update" style="border-left: 3px solid var(--color-green-600);">
+                                <h4 style="color: var(--color-gray-900); margin-bottom: var(--space-2);">✓ Entities Updated</h4>
+                                <p style="color: var(--color-gray-700);">
+                                    ${currentAppointment.company} entity record has been updated with the appointment of ${currentAppointment.appointee}.
+                                </p>
+                            </div>`
+                        );
+                    }
+                    
+                    // Complete the entire workflow
+                    setTimeout(() => {
+                        completeWorkflow(filingMethod);
+                    }, 500);
+                }, 500);
+            }
+        }, delay);
+        delay += 300;
+    });
 }
 
 function completeWorkflow(filingMethod) {
@@ -3939,6 +4209,11 @@ function generateCompletionPanel() {
                     <div class="stepper-dot">${getStepperIcon('completed')}</div>
                     <div class="stepper-label">Filing</div>
                 </div>
+                <div class="stepper-connector active"></div>
+                <div class="stepper-step completed">
+                    <div class="stepper-dot">${getStepperIcon('completed')}</div>
+                    <div class="stepper-label">Entities</div>
+                </div>
             </div>
 
             <!-- Summary -->
@@ -3958,6 +4233,10 @@ function generateCompletionPanel() {
                         <span class="summary-key">${currentAppointment.isReplacement ? 'Appointee' : 'New Director'}</span>
                         <span class="summary-val">${currentAppointment.appointee}</span>
                     </div>
+                    <div class="summary-row">
+                        <span class="summary-key">Consent to Act</span>
+                        <span class="summary-val">${currentAppointment.hasConsentToAct ? '<span style="color: var(--color-green-700);">Yes</span>' : '<span style="color: var(--color-gray-500);">No</span>'}</span>
+                    </div>
                 </div>
             </section>
 
@@ -3966,6 +4245,7 @@ function generateCompletionPanel() {
                 ${generateApprovalSection(processSteps.find(s => s.id === 'approval'))}
                 ${generateLegalFormsSection(processSteps.find(s => s.id === 'legal-forms'))}
                 ${generateFilingSection(processSteps.find(s => s.id === 'filing'))}
+                ${generateEntitiesSection(processSteps.find(s => s.id === 'entities'))}
             </div>
 
             <!-- Actions -->

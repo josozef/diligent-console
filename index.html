@@ -176,12 +176,46 @@
                     </svg>
                 </button>
             </div>
+            <!-- Quick Action Buttons Row -->
+            <div class="hero-quick-actions">
+                <button class="hero-quick-btn" id="heroAppointBtn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7" r="4"></circle>
+                        <line x1="20" y1="8" x2="20" y2="14"></line>
+                        <line x1="23" y1="11" x2="17" y2="11"></line>
+                    </svg>
+                    Appoint a Director
+                </button>
+                <div class="hero-quick-btn-wrapper">
+                    <button class="hero-quick-btn" id="heroOpenAppBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                        Open Application...
+                    </button>
+                    <div class="hero-app-dropdown" id="heroAppDropdown" style="display: none;">
+                        <button class="hero-app-dropdown-item" data-app="boards">Boards</button>
+                        <button class="hero-app-dropdown-item" data-app="entities">Entities</button>
+                        <button class="hero-app-dropdown-item" data-app="risk">Risk Manager</button>
+                    </div>
+                </div>
+                <button class="hero-quick-btn" id="heroAssistToolsBtn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    View Assist Tools
+                </button>
+            </div>
         </div>
 
-            <!-- View Assist Tools Link -->
-            <div class="what-can-i-do-link">
-                <a href="#" id="whatCanIDoBtn">View Assist Tools</a>
-            </div>
+            <!-- View Assist Tools Link - REPLACED by quick action button -->
+            <!-- <div class="what-can-i-do-link"><a href="#" id="whatCanIDoBtn">View Assist Tools</a></div> -->
 
             <!-- Assist Capabilities Container (hidden by default) -->
             <div class="assist-capabilities" id="assistCapabilities" style="display: none;">
