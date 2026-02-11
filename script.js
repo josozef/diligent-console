@@ -1019,6 +1019,7 @@ function showAddPersonForm(appointmentType, step = 1) {
         
         // Reset form data
         window.addPersonFormData = {};
+        window._addPersonSubmitted = false;
         
         // Add user message
         addMessageToChat(currentChatId, 'user', 'I need to add a new appointee');
@@ -1413,25 +1414,40 @@ function generateAppointDirectorForm(appointmentType = 'replace', savedState = {
 }
 
 function initializeAppointDirectorForm() {
-    const companySearch = document.getElementById('companySearch');
-    const directorSearch = document.getElementById('directorSearch');
-    const appointeeSearch = document.getElementById('appointeeSearch');
-    const form = document.getElementById('appointDirectorForm');
-    const submitBtn = document.getElementById('submitFormBtn');
-    
+    // Always get the LAST (most recent) elements since previous forms remain in the chat DOM
+    const allForms = document.querySelectorAll('#appointDirectorForm');
+    const form = allForms[allForms.length - 1];
     if (!form) return;
+    
+    // Scope element lookups to within this specific form
+    const companySearch = form.querySelector('#companySearch');
+    const directorSearch = form.querySelector('#directorSearch');
+    const appointeeSearch = form.querySelector('#appointeeSearch');
+    const submitBtn = form.querySelector('#submitFormBtn');
     
     const appointmentType = form.getAttribute('data-appointment-type');
     const isReplacement = appointmentType === 'replace';
     const savedCompanyId = form.getAttribute('data-saved-company');
     const savedDirectorId = form.getAttribute('data-saved-director');
     const newlyAddedId = form.getAttribute('data-newly-added');
+    
+    // Helper to get a hidden input value scoped to this form
+    function getHiddenValue(id) {
+        const input = form.querySelector('#' + id);
+        return input ? input.value : '';
+    }
+    
+    // Helper to set a hidden input value scoped to this form
+    function setHiddenValue(id, value) {
+        const input = form.querySelector('#' + id);
+        if (input) input.value = value;
+    }
 
     // Company search (only for "add" workflow)
     if (!isReplacement && companySearch) {
         setupSearchField(
             companySearch,
-            document.getElementById('companyResults'),
+            form.querySelector('#companyResults'),
             mockCompanies,
             (item) => `
                 <div style="display: flex; align-items: center; gap: var(--space-2);">
@@ -1443,7 +1459,7 @@ function initializeAppointDirectorForm() {
                 </div>
             `,
             (item) => {
-                document.getElementById('selectedCompanyId').value = item.id;
+                setHiddenValue('selectedCompanyId', item.id);
                 showSelectedItem('selectedCompany', `${item.flag} ${item.name}`, 'companySearch', 'companyResults');
                 
                 // Enable appointee search
@@ -1460,7 +1476,7 @@ function initializeAppointDirectorForm() {
     if (isReplacement && directorSearch) {
         setupSearchField(
             directorSearch,
-            document.getElementById('directorResults'),
+            form.querySelector('#directorResults'),
             mockDirectors,
             (item) => `
                 <div style="display: flex; flex-direction: column; gap: 2px;">
@@ -1470,7 +1486,7 @@ function initializeAppointDirectorForm() {
                 </div>
             `,
             (item) => {
-                document.getElementById('selectedDirectorId').value = item.id;
+                setHiddenValue('selectedDirectorId', item.id);
                 showSelectedItem('selectedDirector', item.name, 'directorSearch', 'directorResults');
                 // Enable appointee search
                 if (appointeeSearch) {
@@ -1485,7 +1501,7 @@ function initializeAppointDirectorForm() {
     // Appointee search
     setupSearchField(
         appointeeSearch,
-        document.getElementById('appointeeResults'),
+        form.querySelector('#appointeeResults'),
         mockAppointees,
         (item) => `
             <div style="display: flex; flex-direction: column; gap: 2px;">
@@ -1494,7 +1510,7 @@ function initializeAppointDirectorForm() {
             </div>
         `,
         (item) => {
-            document.getElementById('selectedAppointeeId').value = item.id;
+            setHiddenValue('selectedAppointeeId', item.id);
             showSelectedItem('selectedAppointee', item.name, 'appointeeSearch', 'appointeeResults');
             checkFormCompletion();
         },
@@ -1519,20 +1535,23 @@ function initializeAppointDirectorForm() {
     });
 
     // Cancel button
-    document.getElementById('cancelFormBtn').addEventListener('click', () => {
-        if (currentChatId) {
-            addMessageToChat(currentChatId, 'assistant', 'No problem. Let me know if you need help with anything else.');
-        }
-    });
+    const cancelBtn = form.querySelector('#cancelFormBtn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            if (currentChatId) {
+                addMessageToChat(currentChatId, 'assistant', 'No problem. Let me know if you need help with anything else.');
+            }
+        });
+    }
 
     function checkFormCompletion() {
-        const appointeeId = document.getElementById('selectedAppointeeId').value;
+        const appointeeId = getHiddenValue('selectedAppointeeId');
         
         if (isReplacement) {
-            const directorId = document.getElementById('selectedDirectorId').value;
+            const directorId = getHiddenValue('selectedDirectorId');
             submitBtn.disabled = !(directorId && appointeeId);
         } else {
-            const companyId = document.getElementById('selectedCompanyId').value;
+            const companyId = getHiddenValue('selectedCompanyId');
             submitBtn.disabled = !(companyId && appointeeId);
         }
     }
@@ -1818,16 +1837,17 @@ function initializeAddPersonForm() {
         // Form submission
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            
-            // Save step 3 data
-            window.addPersonFormData.street = street ? street.value.trim() : '';
-            window.addPersonFormData.city = city ? city.value.trim() : '';
-            window.addPersonFormData.state = state ? state.value.trim() : '';
-            window.addPersonFormData.postal = postal ? postal.value.trim() : '';
-            window.addPersonFormData.country = country ? country.value : '';
-            
             handleAddPersonFormSubmit();
         });
+        
+        // Also add direct click handler on submit button as fallback
+        if (submitBtn) {
+            submitBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAddPersonFormSubmit();
+            });
+        }
         
         // Back button
         if (backBtn) {
@@ -1842,49 +1862,14 @@ function initializeAddPersonForm() {
 }
 
 function handleAddPersonFormSubmit() {
-    const formData = window.addPersonFormData;
+    // Prevent double submission
+    if (window._addPersonSubmitted) return;
+    window._addPersonSubmitted = true;
     
-    // Validate all required fields are present
-    if (!formData.firstName || !formData.lastName || !formData.title || !formData.email ||
-        !formData.dob || !formData.nationality || !formData.passport ||
-        !formData.street || !formData.city || !formData.postal || !formData.country) {
-        return;
-    }
-    
-    // Generate new person ID
-    const newId = 'p' + (mockPeople.length + 1);
-    
-    // Create full name
-    const fullName = `${formData.firstName} ${formData.lastName}`;
-    
-    // Get company from saved state (use the company from the appointment form)
-    const savedState = window.tempAppointmentFormState || {};
-    let company = null;
-    if (savedState.companyId) {
-        company = mockCompanies.find(c => c.id === savedState.companyId);
-    }
-    
-    // Create new person object with all collected data
-    const newPerson = {
-        id: newId,
-        name: fullName,
-        title: formData.title,
-        email: formData.email,
-        company: company ? company.name : 'Unknown',
-        dob: formData.dob,
-        nationality: formData.nationality,
-        passport: formData.passport,
-        address: {
-            street: formData.street,
-            city: formData.city,
-            state: formData.state,
-            postal: formData.postal,
-            country: formData.country
-        }
-    };
-    
-    // Add to mockPeople array (mockAppointees is a reference to mockPeople, so this updates both)
-    mockPeople.push(newPerson);
+    // For prototype purposes: skip all validation, always use Priya Nair
+    const priyaNair = mockPeople.find(p => p.id === 'p2');
+    const newPerson = priyaNair;
+    const fullName = newPerson.name;
     
     // Add user message
     if (currentChatId) {
@@ -1893,7 +1878,7 @@ function handleAddPersonFormSubmit() {
         // Show success message
         setTimeout(() => {
             addMessageToChat(currentChatId, 'assistant', 
-                `Great! I've added <strong>${fullName}</strong> (${formData.title}) to the Entities system. Now let's complete the appointment.`
+                `Great! I've added <strong>${fullName}</strong> (${newPerson.title}) to the Entities system. Now let's complete the appointment.`
             );
             
             // Return to appointment form with the new person selected
@@ -1968,18 +1953,25 @@ function returnToAppointmentForm(newlyAddedPerson = null) {
 }
 
 function handleAppointDirectorFormSubmit() {
-    const form = document.getElementById('appointDirectorForm');
+    // Get the most recent form (there may be multiple in DOM from previous chat messages)
+    const forms = document.querySelectorAll('#appointDirectorForm');
+    const form = forms[forms.length - 1];
+    if (!form) return;
+    
     const appointmentType = form.getAttribute('data-appointment-type');
     const isReplacement = appointmentType === 'replace';
     
-    const appointeeId = document.getElementById('selectedAppointeeId').value;
+    // Get values from the most recent hidden inputs (not stale ones from earlier messages)
+    const appointeeInputs = document.querySelectorAll('#selectedAppointeeId');
+    const appointeeId = appointeeInputs[appointeeInputs.length - 1]?.value;
     const appointee = mockAppointees.find(a => a.id === appointeeId);
     
     let director = null;
     let company = null;
     
     if (isReplacement) {
-        const directorId = document.getElementById('selectedDirectorId').value;
+        const directorInputs = document.querySelectorAll('#selectedDirectorId');
+        const directorId = directorInputs[directorInputs.length - 1]?.value;
         director = mockDirectors.find(d => d.id === directorId);
         if (!director) return;
         
@@ -1992,7 +1984,8 @@ function handleAppointDirectorFormSubmit() {
             company = mockCompanies[4]; // Pacific Polymer Logistics Pte. Ltd.
         }
     } else {
-        const companyId = document.getElementById('selectedCompanyId').value;
+        const companyInputs = document.querySelectorAll('#selectedCompanyId');
+        const companyId = companyInputs[companyInputs.length - 1]?.value;
         company = mockCompanies.find(c => c.id === companyId);
     }
     
@@ -2113,6 +2106,24 @@ function updateChatHeaderActions(state) {
             </span>
         `;
         actionsContainer.style.display = 'flex';
+    } else if (state === 'process-complete') {
+        // Show View Summary button with Completed indicator
+        actionsContainer.innerHTML = `
+            <button class="header-status-btn" onclick="reopenStatusPanel()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
+                    <path d="M9 11l3 3L22 4"></path>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+                View Summary
+            </button>
+            <span class="workflow-complete-tag">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Complete
+            </span>
+        `;
+        actionsContainer.style.display = 'flex';
     } else {
         // Hide header actions
         actionsContainer.style.display = 'none';
@@ -2158,97 +2169,89 @@ function generateAppointmentPanelContent() {
     
     return `
         <div class="appointment-panel">
-            <!-- Summary Section -->
-            <section class="panel-section">
-                <h4 class="panel-section-title">Appointment Summary</h4>
-                
-                <div class="summary-card">
-                    <div class="summary-item">
-                        <label class="summary-label">Company</label>
-                        <div class="summary-value">${company.flag} ${company.name}</div>
-                        <div class="summary-meta">Domiciled in ${company.location}, ${company.country}</div>
+            <!-- Compact Summary -->
+            <section class="panel-section-flush panel-summary-block">
+                <div class="summary-grid">
+                    <div class="summary-row">
+                        <span class="summary-key">Company</span>
+                        <span class="summary-val">${company.flag} ${company.name}</span>
                     </div>
-                    
+                    <div class="summary-row summary-row-meta">
+                        <span class="summary-key"></span>
+                        <span class="summary-val-meta">${company.location}, ${company.country}</span>
+                    </div>
                     ${isReplacement && director ? `
-                    <div class="summary-divider"></div>
-                    
-                    <div class="summary-item">
-                        <label class="summary-label">Resigning Director</label>
-                        <div class="summary-value">${director.name}</div>
-                        <div class="summary-meta">${director.title}</div>
+                    <div class="summary-row">
+                        <span class="summary-key">Replacing</span>
+                        <span class="summary-val">${director.name}</span>
+                    </div>
+                    <div class="summary-row summary-row-meta">
+                        <span class="summary-key"></span>
+                        <span class="summary-val-meta">${director.title}</span>
                     </div>
                     ` : ''}
-                    
-                    <div class="summary-divider"></div>
-                    
-                    <div class="summary-item">
-                        <label class="summary-label">${isReplacement ? 'Appointee' : 'New Director'}</label>
-                        <div class="summary-value">${appointee.name}</div>
-                        <div class="summary-meta">${appointee.title}</div>
+                    <div class="summary-row">
+                        <span class="summary-key">${isReplacement ? 'Appointee' : 'New Director'}</span>
+                        <span class="summary-val">${appointee.name}</span>
+                    </div>
+                    <div class="summary-row summary-row-meta">
+                        <span class="summary-key"></span>
+                        <span class="summary-val-meta">${appointee.title}</span>
                     </div>
                 </div>
             </section>
 
-            <!-- Approvers Section (placeholder) -->
-            <section class="panel-section" id="approversSection">
-                <h4 class="panel-section-title">Approvers</h4>
-                <div class="empty-state" id="approversEmptyState" style="padding: var(--space-4); text-align: center; color: var(--color-gray-500); font-size: var(--text-sm);">
-                    Awaiting approver selection...
+            <!-- Approvers -->
+            <section class="panel-section-flush" id="approversSection">
+                <h4 class="panel-group-label">Approvers</h4>
+                <div class="panel-group-body" id="approversEmptyState">
+                    <span class="empty-inline">Pending selection</span>
                 </div>
-                <div class="approvers-list" id="approversList" style="display: none;"></div>
+                <div class="panel-group-body approvers-compact-list" id="approversList" style="display: none;"></div>
             </section>
 
-            <!-- Documents Section (placeholder) -->
-            <section class="panel-section" id="documentsSection">
-                <h4 class="panel-section-title">Legal Forms</h4>
-                <div class="empty-state" id="documentsEmptyState" style="padding: var(--space-4); text-align: center; color: var(--color-gray-500); font-size: var(--text-sm);">
-                    Awaiting document review...
+            <!-- Legal Forms -->
+            <section class="panel-section-flush" id="documentsSection">
+                <h4 class="panel-group-label">Legal Forms</h4>
+                <div class="panel-group-body" id="documentsEmptyState">
+                    <span class="empty-inline">Pending review</span>
                 </div>
-                <div class="document-list" id="documentsList" style="display: none;"></div>
+                <div class="panel-group-body document-compact-list" id="documentsList" style="display: none;"></div>
             </section>
 
-            <!-- Workflow Section -->
-            <section class="panel-section">
-                <h4 class="panel-section-title">Workflow</h4>
-                <p class="panel-description">
-                    When you start the process, our concierge agent will coordinate the following steps:
-                </p>
-                
-                <div class="workflow-steps">
-                    <div class="workflow-step">
-                        <div class="workflow-step-content">
-                            <div class="workflow-step-title">Approval</div>
-                            <div class="workflow-step-description">
-                                Submit Board Resolution to the <strong>Boards</strong> system for asynchronous approval by board members.
-                            </div>
+            <!-- Workflow Timeline -->
+            <section class="panel-section-flush panel-workflow-section">
+                <h4 class="panel-group-label">Workflow</h4>
+                <div class="workflow-timeline">
+                    <div class="wf-timeline-item">
+                        <div class="wf-timeline-marker"></div>
+                        <div class="wf-timeline-body">
+                            <div class="wf-timeline-title">Approval</div>
+                            <div class="wf-timeline-desc">Submit Board Resolution for asynchronous approval by board members.</div>
                         </div>
                     </div>
-                    
-                    <div class="workflow-step">
-                        <div class="workflow-step-content">
-                            <div class="workflow-step-title">Legal Forms</div>
-                            <div class="workflow-step-description">
-                                Draft and send legal documents including Board Resolution, Consent to Act, and ${company.location === 'Singapore' ? '<strong>Form 45</strong>' : 'regulatory forms'} to <strong>${appointee.name}</strong> for signature.
-                            </div>
+                    <div class="wf-timeline-item">
+                        <div class="wf-timeline-marker"></div>
+                        <div class="wf-timeline-body">
+                            <div class="wf-timeline-title">Legal Forms</div>
+                            <div class="wf-timeline-desc">Draft and send Board Resolution, Consent to Act, and ${company.location === 'Singapore' ? 'Form 45' : 'regulatory forms'} to ${appointee.name} for signature.</div>
                         </div>
                     </div>
-                    
-                    <div class="workflow-step">
-                        <div class="workflow-step-content">
-                            <div class="workflow-step-title">Filing</div>
-                            <div class="workflow-step-description">
-                                ${company.location === 'Singapore' 
-                                    ? 'File <strong>Form 45</strong> with ACRA (Accounting and Corporate Regulatory Authority). You can file manually or use e-Filing through the system.' 
-                                    : `File the required forms with the ${company.location}, ${company.country} regulatory agency.`
-                                }
-                            </div>
+                    <div class="wf-timeline-item">
+                        <div class="wf-timeline-marker"></div>
+                        <div class="wf-timeline-body">
+                            <div class="wf-timeline-title">Filing</div>
+                            <div class="wf-timeline-desc">${company.location === 'Singapore' 
+                                ? 'File Form 45 with ACRA. You can file manually or use e-Filing through the system.' 
+                                : `File the required forms with the ${company.location}, ${company.country} regulatory agency.`
+                            }</div>
                         </div>
                     </div>
                 </div>
             </section>
 
             <!-- Action Section -->
-            <section class="panel-section panel-actions" id="panelActions">
+            <section class="panel-section-flush panel-actions" id="panelActions">
                 <button class="panel-btn-secondary" onclick="closeAppointmentPanel()">Cancel</button>
             </section>
         </div>
@@ -2439,11 +2442,9 @@ function addApproversToPanel(approvers) {
     
     // Populate and show approvers list
     approversList.innerHTML = approvers.map(approver => `
-        <div class="approver-item">
-            <div class="approver-info">
-                <div class="approver-name">${approver.name}</div>
-                <div class="approver-role">${approver.role}</div>
-            </div>
+        <div class="approver-compact-item">
+            <span class="approver-compact-name">${approver.name}</span>
+            <span class="approver-compact-role">${approver.role}</span>
         </div>
     `).join('');
     approversList.style.display = 'block';
@@ -2466,39 +2467,25 @@ function addDocumentsToPanel() {
     
     // Populate and show documents list
     documentsList.innerHTML = `
-        <div class="document-item">
-            <div class="document-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="doc-compact-item">
+            <div class="doc-compact-info">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="doc-compact-icon">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                     <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
                 </svg>
+                <span class="doc-compact-name">Board Resolution</span>
             </div>
-            <div class="document-info">
-                <div class="document-name">Board Resolution</div>
-                <div class="document-meta">For board approval via Boards system</div>
-            </div>
-            <button class="btn-secondary btn-sm" onclick="previewDocument('board-resolution')">
-                Review
-            </button>
+            <button class="doc-review-btn" onclick="previewDocument('board-resolution')">Review</button>
         </div>
-        
-        <div class="document-item">
-            <div class="document-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="doc-compact-item">
+            <div class="doc-compact-info">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="doc-compact-icon">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                     <polyline points="14 2 14 8 20 8"></polyline>
                 </svg>
+                <span class="doc-compact-name">${company && company.location === 'Singapore' ? 'Form 45' : 'Regulatory Filing Form'}</span>
             </div>
-            <div class="document-info">
-                <div class="document-name">${company && company.location === 'Singapore' ? 'Form 45' : 'Regulatory Filing Form'}</div>
-                <div class="document-meta">Government filing for ${company.location}, ${company.country}</div>
-            </div>
-            <button class="btn-secondary btn-sm" onclick="previewDocument('regulatory-form')">
-                Review
-            </button>
+            <button class="doc-review-btn" onclick="previewDocument('regulatory-form')">Review</button>
         </div>
     `;
     documentsList.style.display = 'block';
@@ -2928,54 +2915,62 @@ function generateInProgressPanel() {
     
     return `
         <div class="in-progress-panel">
-            <!-- Hero Status Panel -->
-            <section class="panel-section">
-                <div class="status-hero">
-                    <div class="status-hero-step ${approvalStep.status}">
-                        ${getHeroStatusIcon(approvalStep.status)}
-                        <div class="status-hero-step-content">
-                            <div class="status-hero-step-title">Approval</div>
-                            ${approvalStep.voteCount 
-                                ? `<div class="status-hero-step-meta">${approvalStep.voteCount}</div>`
-                                : approvalStep.status === 'completed'
-                                    ? `<div class="status-hero-step-meta">Complete</div>`
-                                    : ''
-                            }
-                        </div>
-                    </div>
-                    
-                    <div class="status-hero-step ${legalStep.status}">
-                        ${getHeroStatusIcon(legalStep.status)}
-                        <div class="status-hero-step-content">
-                            <div class="status-hero-step-title">Legal Forms</div>
-                            ${legalStep.status === 'completed' 
-                                ? `<div class="status-hero-step-meta">Complete</div>`
-                                : ''
-                            }
-                        </div>
-                    </div>
-                    
-                    <div class="status-hero-step ${filingStep.status}">
-                        ${getHeroStatusIcon(filingStep.status)}
-                        <div class="status-hero-step-content">
-                            <div class="status-hero-step-title">Filing</div>
-                            ${filingStep.status === 'completed' 
-                                ? `<div class="status-hero-step-meta">Complete</div>`
-                                : ''
-                            }
-                        </div>
-                    </div>
+            <!-- Compact Stepper -->
+            <div class="status-stepper">
+                <div class="stepper-step ${approvalStep.status}">
+                    <div class="stepper-dot">${getStepperIcon(approvalStep.status)}</div>
+                    <div class="stepper-label">Approval</div>
+                    ${approvalStep.voteCount 
+                        ? `<div class="stepper-meta">${approvalStep.voteCount}</div>`
+                        : approvalStep.status === 'in_progress'
+                            ? `<div class="stepper-meta stepper-meta-active">In progress</div>`
+                            : ''
+                    }
                 </div>
-            </section>
+                <div class="stepper-connector ${legalStep.status !== 'pending' ? 'active' : ''}"></div>
+                <div class="stepper-step ${legalStep.status}">
+                    <div class="stepper-dot">${getStepperIcon(legalStep.status)}</div>
+                    <div class="stepper-label">Legal Forms</div>
+                    ${legalStep.status === 'completed' 
+                        ? `<div class="stepper-meta">Complete</div>`
+                        : legalStep.status === 'in_progress'
+                            ? `<div class="stepper-meta stepper-meta-active">In progress</div>`
+                            : ''
+                    }
+                </div>
+                <div class="stepper-connector ${filingStep.status !== 'pending' ? 'active' : ''}"></div>
+                <div class="stepper-step ${filingStep.status}">
+                    <div class="stepper-dot">${getStepperIcon(filingStep.status)}</div>
+                    <div class="stepper-label">Filing</div>
+                    ${filingStep.status === 'completed' 
+                        ? `<div class="stepper-meta">Complete</div>`
+                        : filingStep.status === 'in_progress'
+                            ? `<div class="stepper-meta stepper-meta-active">Action needed</div>`
+                            : ''
+                    }
+                </div>
+            </div>
             
-            <!-- Expandable Detail Sections -->
-            <div style="flex: 1; overflow-y: auto;">
+            <!-- Detail Sections -->
+            <div class="status-details">
                 ${generateApprovalSection(approvalStep)}
                 ${generateLegalFormsSection(legalStep)}
                 ${generateFilingSection(filingStep)}
             </div>
         </div>
     `;
+}
+
+function getStepperIcon(status) {
+    switch(status) {
+        case 'completed':
+            return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+        case 'in_progress':
+            return '';
+        case 'pending':
+        default:
+            return '';
+    }
 }
 
 function getHeroStatusIcon(status) {
@@ -3003,55 +2998,44 @@ function generateApprovalSection(step) {
     
     const approvalSubstep = step.substeps.find(s => s.id === 'approval-responses');
     const approvers = approvalSubstep ? approvalSubstep.approvers : [];
+    const approvedCount = approvers.filter(a => a.vote).length;
     
     return `
-        <section class="panel-section">
-            <h4 class="panel-section-title">Approval Details</h4>
-            
-            <div class="process-substeps">
-                ${step.substeps.map(substep => {
-                    // Special handling for approvers
-                    if (substep.approvers) {
-                        return `
-                            <div class="process-substep-group">
-                                <div class="substep-group-title">Board Member Responses</div>
-                                ${substep.approvers.map(approver => `
-                                    <div class="approver-item">
-                                        <div class="approver-info">
-                                            <div class="approver-name">${approver.name}</div>
-                                            <div class="approver-title">${approver.title}</div>
-                                        </div>
-                                        <div class="approver-response">
-                                            ${approver.vote 
-                                                ? `<span class="vote-badge vote-approved">${approver.vote}</span>
-                                                   <span class="approver-time">${approver.time}</span>`
-                                                : `<span class="vote-badge vote-pending">Pending</span>`
-                                            }
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        `;
-                    }
-                    
-                    return `
-                        <div class="process-substep ${substep.status}">
-                            <div class="substep-indicator">
-                                ${getStatusIcon(substep.status)}
-                            </div>
-                            <div class="substep-content">
-                                <div class="substep-name">${substep.name}</div>
-                                ${substep.status === 'in_progress' 
-                                    ? '<div class="substep-meta">In progress...</div>'
-                                    : substep.time 
-                                        ? `<div class="substep-meta">Completed ${substep.time}</div>`
-                                        : ''
-                                }
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
+        <section class="status-detail-section">
+            <div class="detail-section-header">
+                <h4 class="detail-section-title">Approval</h4>
+                ${approvers.length > 0 
+                    ? `<span class="detail-section-badge ${step.status === 'completed' ? 'badge-complete' : 'badge-progress'}">${approvedCount}/${approvers.length}</span>`
+                    : ''
+                }
             </div>
+            
+            <!-- Substep progress -->
+            <div class="status-substeps">
+                ${step.substeps.filter(s => !s.approvers).map(substep => `
+                    <div class="status-substep-row ${substep.status}">
+                        ${getStatusIcon(substep.status)}
+                        <span class="status-substep-label">${substep.name}</span>
+                        ${substep.time ? `<span class="status-substep-time">${substep.time}</span>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+            
+            <!-- Board member votes -->
+            ${approvers.length > 0 ? `
+            <div class="approver-vote-list">
+                ${approvers.map(approver => `
+                    <div class="approver-vote-row ${approver.vote ? 'voted' : ''}">
+                        <span class="approver-vote-name">${approver.name}</span>
+                        ${approver.vote 
+                            ? `<span class="approver-vote-badge">${approver.vote}</span>
+                               <span class="approver-vote-time">${approver.time}</span>`
+                            : `<span class="approver-vote-pending">Pending</span>`
+                        }
+                    </div>
+                `).join('')}
+            </div>
+            ` : ''}
         </section>
     `;
 }
@@ -3059,56 +3043,45 @@ function generateApprovalSection(step) {
 function generateLegalFormsSection(step) {
     if (step.status === 'pending') return '';
     
+    const completedDocs = step.documents.filter(d => d.status === 'completed').length;
+    
     return `
-        <section class="panel-section">
-            <h4 class="panel-section-title">Legal Documents</h4>
+        <section class="status-detail-section">
+            <div class="detail-section-header">
+                <h4 class="detail-section-title">Legal Forms</h4>
+                <span class="detail-section-badge ${step.status === 'completed' ? 'badge-complete' : 'badge-progress'}">${completedDocs}/${step.documents.length}</span>
+            </div>
             
-            <div class="documents-list">
+            <!-- Document status rows -->
+            <div class="doc-status-list">
                 ${step.documents.map(doc => `
-                    <div class="document-item ${doc.status}">
-                        <div class="document-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                <polyline points="14 2 14 8 20 8"></polyline>
-                            </svg>
-                        </div>
-                        <div class="document-info">
-                            <div class="document-name">${doc.name}</div>
-                            <div class="document-status-text">
-                                ${doc.status === 'completed' ? 'Signed & Stored' : 
-                                  doc.status === 'in_progress' ? 'In Progress' : 
-                                  'Pending'}
-                            </div>
-                        </div>
+                    <div class="doc-status-row ${doc.status}">
+                        <div class="doc-status-indicator">${getStatusIcon(doc.status)}</div>
+                        <span class="doc-status-name">${doc.name}</span>
+                        <span class="doc-status-label">${
+                            doc.status === 'completed' ? 'Signed' : 
+                            doc.status === 'in_progress' ? 'In progress' : 
+                            'Pending'
+                        }</span>
                         ${doc.status === 'completed' && doc.docLink 
-                            ? `<button class="btn-secondary btn-sm" onclick="event.preventDefault(); openDocumentFromWorkflow('${doc.docLink}');">
-                                View
-                               </button>`
+                            ? `<button class="doc-view-btn" onclick="event.preventDefault(); openDocumentFromWorkflow('${doc.docLink}');">View</button>`
                             : ''
                         }
                     </div>
                 `).join('')}
             </div>
             
+            <!-- Activity log -->
             ${step.substeps.length > 0 ? `
-                <div class="process-substeps" style="margin-top: var(--space-4);">
-                    ${step.substeps.map(substep => `
-                        <div class="process-substep ${substep.status}">
-                            <div class="substep-indicator">
-                                ${getStatusIcon(substep.status)}
-                            </div>
-                            <div class="substep-content">
-                                <div class="substep-name">${substep.name}</div>
-                                ${substep.status === 'in_progress' 
-                                    ? '<div class="substep-meta">In progress...</div>'
-                                    : substep.time 
-                                        ? `<div class="substep-meta">Completed ${substep.time}</div>`
-                                        : ''
-                                }
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
+            <div class="status-substeps">
+                ${step.substeps.map(substep => `
+                    <div class="status-substep-row ${substep.status}">
+                        ${getStatusIcon(substep.status)}
+                        <span class="status-substep-label">${substep.name}</span>
+                        ${substep.time ? `<span class="status-substep-time">${substep.time}</span>` : ''}
+                    </div>
+                `).join('')}
+            </div>
             ` : ''}
         </section>
     `;
@@ -3118,31 +3091,42 @@ function generateFilingSection(step) {
     if (step.status === 'pending') return '';
     
     return `
-        <section class="panel-section">
-            <h4 class="panel-section-title">Regulatory Filing</h4>
-            
-            <div class="filing-instructions">
-                <p>${step.filingInstructions}</p>
-                
-                ${step.filingMethod === 'e-file' 
-                    ? `<button class="btn-primary" onclick="eFileDocument()" style="margin-top: var(--space-3);">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-2);">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="17 8 12 3 7 8"></polyline>
-                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                        E-File Form 45 with ACRA
-                       </button>`
-                    : `<button class="btn-secondary" onclick="downloadFilingDocuments()" style="margin-top: var(--space-3);">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-2);">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                        Download Filing Documents
-                       </button>`
+        <section class="status-detail-section">
+            <div class="detail-section-header">
+                <h4 class="detail-section-title">Filing</h4>
+                ${step.status === 'completed' 
+                    ? `<span class="detail-section-badge badge-complete">Filed</span>`
+                    : `<span class="detail-section-badge badge-action">Action needed</span>`
                 }
             </div>
+            
+            ${step.status === 'completed' 
+                ? `<div class="filing-card">
+                    <p class="filing-card-text" style="margin-bottom: 0;">Documents have been filed. The appointment process is complete.</p>
+                  </div>`
+                : `<div class="filing-card">
+                    <p class="filing-card-text">File the signed documents with the regulatory body. You can e-File directly through ACRA or download the documents to file manually.</p>
+                    
+                    <div class="filing-actions">
+                        <button class="filing-action-btn filing-action-primary" onclick="eFileDocument()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            E-File with ACRA
+                        </button>
+                        <button class="filing-action-btn filing-action-secondary" onclick="downloadFilingDocuments()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Download &amp; File Manually
+                        </button>
+                    </div>
+                  </div>`
+            }
         </section>
     `;
 }
@@ -3302,7 +3286,12 @@ function reopenStatusPanel() {
     if (processRunning) {
         openInProgressPanel();
     } else {
-        openAppointmentPanel();
+        // Process is complete - show completion panel
+        chatView.classList.add('show-right-panel');
+        currentPanelType = 'completion';
+        document.querySelector('.right-panel-title').textContent = 'Process Status';
+        const panelContent = document.querySelector('.right-panel-content');
+        panelContent.innerHTML = generateCompletionPanel();
     }
 }
 
@@ -3714,50 +3703,28 @@ function simulateLiveUpdates() {
 }
 
 function eFileDocument() {
-    if (currentChatId) {
-        addMessageToChat(currentChatId, 'assistant',
-            `✓ Form 45 has been successfully submitted to ACRA via e-Filing. You will receive a confirmation email once the filing is processed (typically within 1-2 business days).`
-        );
-    }
-    
     // Mark filing as complete
     const filingStep = processSteps.find(s => s.id === 'filing');
     if (filingStep) {
         filingStep.status = 'completed';
-        
-        // Refresh panel
-        if (chatView.classList.contains('show-right-panel')) {
-            const panelContent = document.querySelector('.right-panel-content');
-            panelContent.innerHTML = generateInProgressPanel();
-        }
     }
+    
+    // Complete the entire workflow
+    completeWorkflow('e-file');
 }
 
 function downloadFilingDocuments() {
-    // Trigger download
-    const { company, appointee } = currentAppointment;
-    const filename = `Regulatory_Filing_${appointee.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-    
-    if (currentChatId) {
-        addMessageToChat(currentChatId, 'assistant',
-            `✓ Filing documents have been downloaded. Please file the signed forms with the appropriate regulatory body according to your jurisdiction's requirements.`
-        );
-    }
-    
     // Mark filing as complete
     const filingStep = processSteps.find(s => s.id === 'filing');
     if (filingStep) {
         filingStep.status = 'completed';
-        
-        // Refresh panel
-        if (chatView.classList.contains('show-right-panel')) {
-            const panelContent = document.querySelector('.right-panel-content');
-            panelContent.innerHTML = generateInProgressPanel();
-        }
     }
+    
+    // Complete the entire workflow
+    completeWorkflow('download');
 }
 
-function completeWorkflow() {
+function completeWorkflow(filingMethod) {
     if (!processRunning) return;
     
     processRunning = false;
@@ -3769,8 +3736,8 @@ function completeWorkflow() {
         chat.hasUpdate = true;
     }
     
-    // Update history display
-    // updateChatHistoryDisplay(); // Removed - sidebar no longer exists
+    // Update chat header to show completed state
+    updateChatHeaderActions('process-complete');
     
     // Show completion panel
     if (chatView.classList.contains('show-right-panel')) {
@@ -3782,14 +3749,21 @@ function completeWorkflow() {
     // Send completion message to chat
     if (currentChatId) {
         const { company, appointee } = window.selectedAppointment || {};
+        const filingNote = filingMethod === 'e-file'
+            ? 'Form 45 has been submitted to ACRA via e-Filing. You will receive a confirmation email once the filing is processed (typically 1-2 business days).'
+            : 'Filing documents have been downloaded. Please file the signed forms with the appropriate regulatory body.';
+        
         addMessageToChat(currentChatId, 'assistant', 
-            `<div style="padding: var(--space-4); background: var(--color-gray-50); border-left: 3px solid var(--color-gray-800); border-radius: var(--radius-md);">
+            `<div style="padding: var(--space-4); background: var(--color-green-50); border-left: 3px solid var(--color-green-600); border-radius: var(--radius-md);">
                 <h4 style="color: var(--color-gray-900); margin-bottom: var(--space-2);">✓ Appointment Process Complete</h4>
                 <p style="color: var(--color-gray-700); margin-bottom: var(--space-2);">
                     The appointment of <strong>${appointee ? appointee.name : 'the appointee'}</strong> to <strong>${company ? company.name : 'the company'}</strong> has been successfully completed.
                 </p>
+                <p style="color: var(--color-gray-600); font-size: var(--text-sm); margin-bottom: var(--space-2);">
+                    ${filingNote}
+                </p>
                 <p style="color: var(--color-gray-600); font-size: var(--text-sm);">
-                    All documents have been filed and stored in the document repository. Entity records have been updated.
+                    All documents have been stored in the document repository. Entity records have been updated.
                 </p>
                 <button class="preview-panel-btn" onclick="reopenStatusPanel()" style="margin-top: var(--space-3);">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
@@ -3808,56 +3782,66 @@ function generateCompletionPanel() {
     
     return `
         <div class="in-progress-panel">
-            <!-- Header with Status -->
-            <section class="panel-section">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3);">
-                    <div>
-                        <h4 class="panel-section-title" style="margin-bottom: var(--space-1);">Director Appointment</h4>
-                        <span class="status-badge status-completed">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px;">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                            Completed
-                        </span>
-                    </div>
+            <!-- Completion Header -->
+            <div class="completion-header">
+                <div class="completion-check">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
                 </div>
-            </section>
+                <div class="completion-header-text">
+                    <div class="completion-title">Appointment Complete</div>
+                    <div class="completion-subtitle">${currentAppointment.appointee} appointed to ${currentAppointment.company}</div>
+                </div>
+            </div>
 
-            <!-- Context Summary -->
-            <section class="panel-section">
-                <h4 class="panel-section-title">Appointment Details</h4>
-                
-                <div class="summary-card-compact">
-                    <div class="summary-item-compact">
-                        <label class="summary-label">Company</label>
-                        <div class="summary-value">${currentAppointment.company}</div>
+            <!-- Completed Stepper -->
+            <div class="status-stepper">
+                <div class="stepper-step completed">
+                    <div class="stepper-dot">${getStepperIcon('completed')}</div>
+                    <div class="stepper-label">Approval</div>
+                </div>
+                <div class="stepper-connector active"></div>
+                <div class="stepper-step completed">
+                    <div class="stepper-dot">${getStepperIcon('completed')}</div>
+                    <div class="stepper-label">Legal Forms</div>
+                </div>
+                <div class="stepper-connector active"></div>
+                <div class="stepper-step completed">
+                    <div class="stepper-dot">${getStepperIcon('completed')}</div>
+                    <div class="stepper-label">Filing</div>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <section class="panel-section-flush panel-summary-block">
+                <div class="summary-grid">
+                    <div class="summary-row">
+                        <span class="summary-key">Company</span>
+                        <span class="summary-val">${currentAppointment.company}</span>
                     </div>
-                    
                     ${currentAppointment.resigningDirector ? `
-                    <div class="summary-item-compact">
-                        <label class="summary-label">Resigning Director</label>
-                        <div class="summary-value">${currentAppointment.resigningDirector}</div>
+                    <div class="summary-row">
+                        <span class="summary-key">Replacing</span>
+                        <span class="summary-val">${currentAppointment.resigningDirector}</span>
                     </div>
                     ` : ''}
-                    
-                    <div class="summary-item-compact">
-                        <label class="summary-label">${currentAppointment.isReplacement ? 'Appointee' : 'New Director'}</label>
-                        <div class="summary-value">${currentAppointment.appointee}</div>
+                    <div class="summary-row">
+                        <span class="summary-key">${currentAppointment.isReplacement ? 'Appointee' : 'New Director'}</span>
+                        <span class="summary-val">${currentAppointment.appointee}</span>
                     </div>
                 </div>
             </section>
 
-            <!-- Workflow Progress -->
-            <section class="panel-section" style="flex: 1; overflow-y: auto;">
-                <h4 class="panel-section-title">Completed Steps</h4>
-                
-                <div class="process-steps">
-                    ${processSteps.map((step, stepIdx) => generateStepHTML(step, stepIdx)).join('')}
-                </div>
-            </section>
+            <!-- Completed Steps Detail -->
+            <div class="status-details" style="flex: 1; overflow-y: auto;">
+                ${generateApprovalSection(processSteps.find(s => s.id === 'approval'))}
+                ${generateLegalFormsSection(processSteps.find(s => s.id === 'legal-forms'))}
+                ${generateFilingSection(processSteps.find(s => s.id === 'filing'))}
+            </div>
 
             <!-- Actions -->
-            <section class="panel-section panel-actions">
+            <section class="panel-section-flush panel-actions">
                 <button class="panel-btn-secondary" onclick="chatView.classList.remove('show-right-panel')">Close</button>
             </section>
         </div>
@@ -4008,9 +3992,23 @@ function generateDocumentViewerPanel(docId, previousPanelType) {
 }
 
 function navigateBackFromDocument(previousPanelType) {
-    // Navigate back to the previous panel
+    // Navigate back to the previous panel without resetting state or adding chat messages
     if (previousPanelType === 'appointment') {
-        openAppointmentPanel();
+        // Restore the preview panel content only — do NOT call openAppointmentPanel()
+        // as that resets workflow state and re-triggers chat messages
+        currentPanelType = 'appointment';
+        document.querySelector('.right-panel-title').textContent = 'Preview Workflow';
+        const panelContent = document.querySelector('.right-panel-content');
+        panelContent.innerHTML = generateAppointmentPanelContent();
+        
+        // Re-populate approvers and documents if they were already selected
+        const state = window.appointmentWorkflowState || {};
+        if (state.approversSelected && state.selectedApprovers.length > 0) {
+            addApproversToPanel(state.selectedApprovers);
+        }
+        if (state.documentsReviewed) {
+            addDocumentsToPanel();
+        }
     } else if (previousPanelType === 'process') {
         openInProgressPanel();
     } else if (previousPanelType === 'completion') {
