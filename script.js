@@ -808,24 +808,14 @@ function generateResponse(message) {
             </div>
         `;
     } else if (lowerMessage.includes('replace') && lowerMessage.includes('director') && (lowerMessage.includes('david') || lowerMessage.includes('chen'))) {
-        // Handle "Replace director David Chen" pattern with disambiguation
-        return generateDirectorDisambiguation();
+        // HIDDEN: Replace director flow disabled for now - route to Add flow
+        return generateAppointDirectorForm('add');
     } else if (lowerMessage.includes('appoint') && lowerMessage.includes('director')) {
-        // Check if user is specifying replace or add
-        if (lowerMessage.includes('replace')) {
-            return generateAppointDirectorForm('replace');
-        } else if (lowerMessage.includes('add')) {
-            return generateAppointDirectorForm('add');
-        } else {
-            return generateAppointmentTypeSelection();
-        }
+        // All director appointment prompts go to Add New Director flow
+        return generateAppointDirectorForm('add');
     } else if ((lowerMessage.includes('replace') || lowerMessage.includes('add')) && (lowerMessage.includes('director') || lowerMessage.includes('board'))) {
-        // Handle direct "replace a director" or "add a director" messages
-        if (lowerMessage.includes('replace')) {
-            return generateAppointDirectorForm('replace');
-        } else if (lowerMessage.includes('add')) {
-            return generateAppointDirectorForm('add');
-        }
+        // All director-related messages go to Add New Director flow
+        return generateAppointDirectorForm('add');
     } else if (lowerMessage.includes('open') && lowerMessage.includes('application')) {
         return `
             <h3 style="margin-bottom: var(--space-3); color: var(--color-gray-900);">Recent Applications</h3>
@@ -934,6 +924,10 @@ const mockDirectors = mockPeople;
 const mockAppointees = mockPeople;
 
 function generateAppointmentTypeSelection() {
+    // HIDDEN: Replace Director choice disabled - go directly to Add New Director
+    return generateAppointDirectorForm('add');
+    
+    /* PRESERVED: Original appointment type selection UI
     return `
         <h3 style="margin-bottom: var(--space-3); color: var(--color-gray-900);">Appoint a Director</h3>
         <p style="margin-bottom: var(--space-5); line-height: var(--leading-normal); color: var(--color-gray-700);">
@@ -974,16 +968,20 @@ function generateAppointmentTypeSelection() {
         
         <div style="padding: var(--space-3); background: var(--color-gray-50); border-radius: var(--radius-md); border: 1px solid var(--color-gray-200);">
             <p style="font-size: var(--text-xs); color: var(--color-gray-600); line-height: var(--leading-normal);">
-                💡 You can also type "replace a director" or "add a director" to make your selection.
+                You can also type "replace a director" or "add a director" to make your selection.
             </p>
         </div>
     `;
+    */
 }
 
 function selectAppointmentType(type) {
     if (!currentChatId) return;
     
-    const typeText = type === 'replace' ? 'Replace an existing director' : 'Add a new director';
+    // HIDDEN: Replace flow disabled - always use 'add'
+    type = 'add';
+    
+    const typeText = 'Add a new director';
     
     // Add user's selection as a message
     addMessageToChat(currentChatId, 'user', typeText);
@@ -1405,6 +1403,31 @@ function generateAppointDirectorForm(appointmentType = 'replace', savedState = {
                 </div>
             </div>
 
+            <!-- Consent to Act -->
+            <div class="form-field" id="consentField" style="display: none;">
+                <label class="form-label">Do you have a Consent to Act for this appointee?</label>
+                <div class="consent-toggle" id="consentToggle">
+                    <button type="button" class="consent-btn" data-value="yes" id="consentYesBtn">Yes</button>
+                    <button type="button" class="consent-btn" data-value="no" id="consentNoBtn">No</button>
+                </div>
+                <input type="hidden" id="hasConsentToAct" value="" />
+                <div id="consentDownload" style="display: none; margin-top: var(--space-3);">
+                    <div style="padding: var(--space-3); background: var(--color-gray-50); border-radius: var(--radius-md); border: 1px solid var(--color-gray-200);">
+                        <p style="font-size: var(--text-xs); color: var(--color-gray-600); margin-bottom: var(--space-2);">
+                            A Consent to Act is required for this appointment. Download the template below and have the appointee sign it.
+                        </p>
+                        <button type="button" class="filing-action-btn filing-action-secondary" onclick="downloadConsentTemplate()" style="font-size: var(--text-xs);">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Download Consent to Act Template
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="form-actions">
                 <button type="button" class="form-btn-secondary" id="cancelFormBtn">Cancel</button>
                 <button type="submit" class="form-btn-primary" id="submitFormBtn" ${(isReplacement && preSelectedDirector && preSelectedAppointee) || (!isReplacement && preSelectedCompany && preSelectedAppointee) ? '' : 'disabled'}>Continue</button>
@@ -1546,14 +1569,50 @@ function initializeAppointDirectorForm() {
 
     function checkFormCompletion() {
         const appointeeId = getHiddenValue('selectedAppointeeId');
+        const consentValue = getHiddenValue('hasConsentToAct');
+        
+        // Show consent field when appointee is selected
+        const consentField = form.querySelector('#consentField');
+        if (consentField) {
+            consentField.style.display = appointeeId ? 'flex' : 'none';
+        }
         
         if (isReplacement) {
             const directorId = getHiddenValue('selectedDirectorId');
-            submitBtn.disabled = !(directorId && appointeeId);
+            submitBtn.disabled = !(directorId && appointeeId && consentValue);
         } else {
             const companyId = getHiddenValue('selectedCompanyId');
-            submitBtn.disabled = !(companyId && appointeeId);
+            submitBtn.disabled = !(companyId && appointeeId && consentValue);
         }
+    }
+    
+    // Wire up Consent to Act buttons
+    const consentYesBtn = form.querySelector('#consentYesBtn');
+    const consentNoBtn = form.querySelector('#consentNoBtn');
+    const consentDownload = form.querySelector('#consentDownload');
+    
+    if (consentYesBtn) {
+        consentYesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setHiddenValue('hasConsentToAct', 'yes');
+            consentYesBtn.classList.add('consent-btn-active');
+            consentNoBtn.classList.remove('consent-btn-active');
+            if (consentDownload) consentDownload.style.display = 'none';
+            checkFormCompletion();
+        });
+    }
+    
+    if (consentNoBtn) {
+        consentNoBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setHiddenValue('hasConsentToAct', 'no');
+            consentNoBtn.classList.add('consent-btn-active');
+            consentYesBtn.classList.remove('consent-btn-active');
+            if (consentDownload) consentDownload.style.display = 'block';
+            checkFormCompletion();
+        });
     }
     
     // If returning with a newly added person, ensure appointee field is enabled and button state is correct
@@ -1991,12 +2050,17 @@ function handleAppointDirectorFormSubmit() {
     
     if (!company || !appointee) return;
     
+    // Get consent to act selection
+    const consentInputs = document.querySelectorAll('#hasConsentToAct');
+    const hasConsent = consentInputs[consentInputs.length - 1]?.value || 'yes';
+    
     // Store selection for later use
     window.selectedAppointment = { 
         company, 
         director: director, 
         appointee,
-        isReplacement 
+        isReplacement,
+        hasConsentToAct: hasConsent === 'yes'
     };
     
     // Create summary message from user
@@ -2152,7 +2216,7 @@ function reopenStatusPanel() {
 }
 
 function generateAppointmentPanelContent() {
-    const { company, director, appointee, isReplacement } = window.selectedAppointment || {};
+    const { company, director, appointee, isReplacement, hasConsentToAct } = window.selectedAppointment || {};
     
     if (!company || !appointee) {
         return '<p>Error: Appointment data not found</p>';
@@ -2234,7 +2298,7 @@ function generateAppointmentPanelContent() {
                         <div class="wf-timeline-marker"></div>
                         <div class="wf-timeline-body">
                             <div class="wf-timeline-title">Legal Forms</div>
-                            <div class="wf-timeline-desc">Draft and send Board Resolution, Consent to Act, and ${company.location === 'Singapore' ? 'Form 45' : 'regulatory forms'} to ${appointee.name} for signature.</div>
+                            <div class="wf-timeline-desc">Draft and send Board Resolution${hasConsentToAct === false ? ', Consent to Act,' : ''} and ${company.location === 'Singapore' ? 'Form 45' : 'regulatory forms'} to ${appointee.name} for signature.</div>
                         </div>
                     </div>
                     <div class="wf-timeline-item">
@@ -2372,8 +2436,11 @@ function confirmApprovers() {
 
 // Generate document review UI in chat
 function generateDocumentReviewUI() {
-    const { company } = window.selectedAppointment || {};
+    const { company, hasConsentToAct } = window.selectedAppointment || {};
     const regulatoryFormName = company && company.location === 'Singapore' ? 'Form 45' : 'Regulatory Filing Form';
+    
+    // Only show Consent to Act if user said they don't have one (we need to generate it)
+    const showConsent = hasConsentToAct === false;
     
     return `
         <h4 style="margin-bottom: var(--space-3); color: var(--color-gray-900);">Review Documents</h4>
@@ -2390,6 +2457,7 @@ function generateDocumentReviewUI() {
                     </svg>
                     <span>Board Resolution</span>
                 </li>
+                ${showConsent ? `
                 <li style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-gray-700);">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -2397,6 +2465,7 @@ function generateDocumentReviewUI() {
                     </svg>
                     <span>Consent to Act as Director</span>
                 </li>
+                ` : ''}
                 <li style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-gray-700);">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -2457,13 +2526,16 @@ function addApproversToPanel(approvers) {
 
 // New function to add documents section to panel
 function addDocumentsToPanel() {
-    const { appointee, company } = window.selectedAppointment || {};
+    const { appointee, company, hasConsentToAct } = window.selectedAppointment || {};
     const emptyState = document.getElementById('documentsEmptyState');
     const documentsList = document.getElementById('documentsList');
     if (!emptyState || !documentsList) return;
     
     // Hide empty state
     emptyState.style.display = 'none';
+    
+    // Only show Consent to Act if user said they don't have one
+    const showConsent = hasConsentToAct === false;
     
     // Populate and show documents list
     documentsList.innerHTML = `
@@ -2477,6 +2549,18 @@ function addDocumentsToPanel() {
             </div>
             <button class="doc-review-btn" onclick="previewDocument('board-resolution')">Review</button>
         </div>
+        ${showConsent ? `
+        <div class="doc-compact-item">
+            <div class="doc-compact-info">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="doc-compact-icon">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                <span class="doc-compact-name">Consent to Act</span>
+            </div>
+            <button class="doc-review-btn" onclick="previewDocument('consent-form')">Review</button>
+        </div>
+        ` : ''}
         <div class="doc-compact-item">
             <div class="doc-compact-info">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="doc-compact-icon">
@@ -2782,7 +2866,8 @@ function startAppointmentWorkflow() {
         resigningDirectorTitle: isReplacement && director ? director.title : null,
         appointee: appointee.name,
         appointeeTitle: appointee.title,
-        isReplacement: isReplacement
+        isReplacement: isReplacement,
+        hasConsentToAct: window.selectedAppointment?.hasConsentToAct ?? true
     };
     
     // Build entity update substeps based on appointment type
@@ -2839,7 +2924,7 @@ function startAppointmentWorkflow() {
             status: 'pending',
             documents: [
                 { id: 'board-resolution', name: 'Board Resolution', status: 'pending', docLink: null },
-                { id: 'consent-form', name: 'Consent to Act', status: 'pending', docLink: null },
+                ...(!currentAppointment.hasConsentToAct ? [{ id: 'consent-form', name: 'Consent to Act', status: 'pending', docLink: null }] : []),
                 { id: 'regulatory-form', name: company.location === 'Singapore' ? 'Form 45' : 'Regulatory Form', status: 'pending', docLink: null }
             ],
             substeps: [
@@ -3474,24 +3559,27 @@ function simulateLiveUpdates() {
     });
     legalDelay += 300; // 0.3s
     
-    updates.push({
-        type: 'document',
-        stepId: 'legal-forms',
-        documentId: 'consent-form',
-        status: 'in_progress',
-        delay: legalDelay
-    });
-    legalDelay += 400; // 0.4s
-    
-    updates.push({
-        type: 'document',
-        stepId: 'legal-forms',
-        documentId: 'consent-form',
-        status: 'completed',
-        docLink: 'consent-form-signed',
-        delay: legalDelay
-    });
-    legalDelay += 300; // 0.3s
+    // Only include Consent to Act if user doesn't have one
+    if (!currentAppointment.hasConsentToAct) {
+        updates.push({
+            type: 'document',
+            stepId: 'legal-forms',
+            documentId: 'consent-form',
+            status: 'in_progress',
+            delay: legalDelay
+        });
+        legalDelay += 400; // 0.4s
+        
+        updates.push({
+            type: 'document',
+            stepId: 'legal-forms',
+            documentId: 'consent-form',
+            status: 'completed',
+            docLink: 'consent-form-signed',
+            delay: legalDelay
+        });
+        legalDelay += 300; // 0.3s
+    }
     
     // Process first 2 substeps (draft, send)
     legalStep.substeps.slice(0, 2).forEach((substep, idx) => {
@@ -3722,6 +3810,22 @@ function downloadFilingDocuments() {
     
     // Complete the entire workflow
     completeWorkflow('download');
+}
+
+function downloadConsentTemplate() {
+    // Simulate downloading a Consent to Act template
+    const link = document.createElement('a');
+    link.href = '#';
+    link.download = 'Consent_to_Act_Template.pdf';
+    link.click();
+    
+    // Show brief confirmation
+    const btn = event.target.closest('button');
+    if (btn) {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Downloaded`;
+        setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+    }
 }
 
 function completeWorkflow(filingMethod) {

@@ -2528,6 +2528,42 @@ input[type="date"].search-input::-webkit-calendar-picker-indicator {
     color: var(--color-gray-900);
 }
 
+/* Consent to Act Toggle */
+.consent-toggle {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.consent-btn {
+    flex: 1;
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    font-family: var(--font-sans);
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--radius-md);
+    color: var(--color-gray-700);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+}
+
+.consent-btn:hover {
+    background: var(--color-gray-50);
+    border-color: var(--color-gray-400);
+}
+
+.consent-btn.consent-btn-active {
+    background: var(--color-gray-900);
+    border-color: var(--color-gray-900);
+    color: var(--color-white);
+}
+
+.consent-btn.consent-btn-active:hover {
+    background: var(--color-gray-800);
+}
+
 .form-actions {
     display: flex;
     justify-content: flex-end;
