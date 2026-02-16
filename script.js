@@ -2125,14 +2125,7 @@ function handleAppointDirectorFormSubmit() {
         setTimeout(() => {
             const response = `
                 <div>
-                    <p style="margin-bottom: var(--space-3);">Perfect. I'm preparing the appointment workflow for ${company.name}.</p>
-                    <button class="preview-panel-btn" onclick="openAppointmentPanel()">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="9" y1="3" x2="9" y2="21"></line>
-                        </svg>
-                        Preview Appointment Details
-                    </button>
+                    <p>Perfect. I'm preparing the appointment workflow for ${company.name}.</p>
                 </div>
             `;
             addMessageToChat(currentChatId, 'assistant', response);
@@ -2343,7 +2336,7 @@ function generateAppointmentPanelContent() {
 
             <!-- Legal Forms -->
             <section class="panel-section-flush" id="documentsSection">
-                <h4 class="panel-group-label">Legal Forms</h4>
+                <h4 class="panel-group-label">Documents</h4>
                 <div class="panel-group-body" style="padding: var(--space-2) 0; border-bottom: 1px solid var(--color-gray-100);">
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: var(--text-xs);">
                         <span style="color: var(--color-gray-600);">Consent to Act</span>
@@ -2364,24 +2357,14 @@ function generateAppointmentPanelContent() {
                         <div class="wf-timeline-marker"></div>
                         <div class="wf-timeline-body">
                             <div class="wf-timeline-title">Approval</div>
-                            <div class="wf-timeline-desc">Submit Board Resolution for asynchronous approval by board members.</div>
-                        </div>
-                    </div>
-                    <div class="wf-timeline-item">
-                        <div class="wf-timeline-marker"></div>
-                        <div class="wf-timeline-body">
-                            <div class="wf-timeline-title">Legal Forms</div>
-                            <div class="wf-timeline-desc">Draft and send Board Resolution and ${company.location === 'Singapore' ? 'Form 45' : 'regulatory forms'} to ${appointee.name} for signature.</div>
+                            <div class="wf-timeline-desc">Submit Board Resolution for asynchronous approval by board members. Once approved, download the signed resolution.</div>
                         </div>
                     </div>
                     <div class="wf-timeline-item">
                         <div class="wf-timeline-marker"></div>
                         <div class="wf-timeline-body">
                             <div class="wf-timeline-title">Filing</div>
-                            <div class="wf-timeline-desc">${company.location === 'Singapore' 
-                                ? 'File Form 45 with ACRA. You can file manually or use e-Filing through the system.' 
-                                : `File the required forms with the ${company.location}, ${company.country} regulatory agency.`
-                            }</div>
+                            <div class="wf-timeline-desc">File the signed Board Resolution and Form 45 (assumed already signed offline) with ${company.location === 'Singapore' ? 'ACRA' : 'the regulatory body'}.</div>
                         </div>
                     </div>
                     <div class="wf-timeline-item">
@@ -2613,13 +2596,10 @@ function confirmApprovers() {
 
 // Generate document review UI in chat
 function generateDocumentReviewUI() {
-    const { company } = window.selectedAppointment || {};
-    const regulatoryFormName = company && company.location === 'Singapore' ? 'Form 45' : 'Regulatory Filing Form';
-    
     return `
         <h4 style="margin-bottom: var(--space-3); color: var(--color-gray-900);">Review Documents</h4>
         <p style="margin-bottom: var(--space-4); line-height: var(--leading-normal); color: var(--color-gray-700);">
-            Please review the documents that will be used in this appointment process. These documents have been added to the preview panel on the right.
+            Please review the Board Resolution that will be sent to board members for approval. The document has been added to the preview panel on the right.
         </p>
         
         <div style="background: var(--color-gray-50); padding: var(--space-4); border-radius: var(--radius-lg); margin-bottom: var(--space-3);">
@@ -2630,13 +2610,6 @@ function generateDocumentReviewUI() {
                         <polyline points="14 2 14 8 20 8"></polyline>
                     </svg>
                     <span>Board Resolution</span>
-                </li>
-                <li style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-gray-700);">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                    </svg>
-                    <span>${regulatoryFormName}</span>
                 </li>
             </ul>
             
@@ -2708,7 +2681,7 @@ function addDocumentsToPanel() {
     // Hide empty state
     emptyState.style.display = 'none';
     
-    // Populate and show documents list (Consent to Act removed - just recorded as yes/no)
+    // Only show Board Resolution (Form 45 assumed already signed offline)
     documentsList.innerHTML = `
         <div class="doc-compact-item">
             <div class="doc-compact-info">
@@ -2719,16 +2692,6 @@ function addDocumentsToPanel() {
                 <span class="doc-compact-name">Board Resolution</span>
             </div>
             <button class="doc-review-btn" onclick="previewDocument('board-resolution')">Review</button>
-        </div>
-        <div class="doc-compact-item">
-            <div class="doc-compact-info">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="doc-compact-icon">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-                <span class="doc-compact-name">${company && company.location === 'Singapore' ? 'Form 45' : 'Regulatory Filing Form'}</span>
-            </div>
-            <button class="doc-review-btn" onclick="previewDocument('regulatory-form')">Review</button>
         </div>
     `;
     documentsList.style.display = 'block';
@@ -3079,15 +3042,16 @@ function startAppointmentWorkflow() {
     }));
     
     // Initialize workflow steps with sub-statuses
-    // New structure: 3 main steps with documents and details
+    // Simplified workflow: Approval (generates Board Resolution) → Filing (manual) → Update Entities
     processSteps = [
         {
             id: 'approval',
             name: 'Approval',
             status: 'in_progress',
             voteCount: null, // Will show e.g. "4/4 Approved"
+            boardResolution: { id: 'board-resolution', name: 'Board Resolution', status: 'pending', docLink: null },
             substeps: [
-                { id: 'approval-create', name: 'Create approval request', status: 'completed', time: 'Jan 7, 9:00 AM' },
+                { id: 'approval-create', name: 'Create Board Resolution', status: 'completed', time: 'Jan 7, 9:00 AM' },
                 { id: 'approval-send', name: 'Send to board members', status: 'in_progress', time: null },
                 { 
                     id: 'approval-responses', 
@@ -3099,28 +3063,9 @@ function startAppointmentWorkflow() {
             ]
         },
         {
-            id: 'legal-forms',
-            name: 'Legal Forms',
-            status: 'pending',
-            documents: [
-                { id: 'board-resolution', name: 'Board Resolution', status: 'pending', docLink: null },
-                { id: 'regulatory-form', name: company.location === 'Singapore' ? 'Form 45' : 'Regulatory Form', status: 'pending', docLink: null }
-            ],
-            substeps: [
-                { id: 'forms-draft', name: 'Draft legal documents', status: 'pending', time: null },
-                { id: 'forms-send', name: `Email forms to ${appointee.name}`, status: 'pending', time: null },
-                { id: 'forms-receive', name: 'Receive signed documents', status: 'pending', time: null },
-                { id: 'forms-validate', name: 'Validate completeness', status: 'pending', time: null }
-            ]
-        },
-        {
             id: 'filing',
             name: 'Filing',
             status: 'pending',
-            filingMethod: company.location === 'Singapore' ? 'e-file' : 'manual',
-            filingInstructions: company.location === 'Singapore' 
-                ? 'File Form 45 with ACRA using the e-Filing system below.'
-                : 'Download the signed regulatory form and file with the appropriate regulatory body.',
             substeps: []
         },
         {
@@ -3180,7 +3125,6 @@ function openInProgressPanel() {
 
 function generateInProgressPanel() {
     const approvalStep = processSteps.find(s => s.id === 'approval');
-    const legalStep = processSteps.find(s => s.id === 'legal-forms');
     const filingStep = processSteps.find(s => s.id === 'filing');
     const entitiesStep = processSteps.find(s => s.id === 'entities');
     
@@ -3194,17 +3138,6 @@ function generateInProgressPanel() {
                     ${approvalStep.voteCount 
                         ? `<div class="stepper-meta">${approvalStep.voteCount}</div>`
                         : approvalStep.status === 'in_progress'
-                            ? `<div class="stepper-meta stepper-meta-active">In progress</div>`
-                            : ''
-                    }
-                </div>
-                <div class="stepper-connector ${legalStep.status !== 'pending' ? 'active' : ''}"></div>
-                <div class="stepper-step ${legalStep.status}">
-                    <div class="stepper-dot">${getStepperIcon(legalStep.status)}</div>
-                    <div class="stepper-label">Legal Forms</div>
-                    ${legalStep.status === 'completed' 
-                        ? `<div class="stepper-meta">Complete</div>`
-                        : legalStep.status === 'in_progress'
                             ? `<div class="stepper-meta stepper-meta-active">In progress</div>`
                             : ''
                     }
@@ -3236,7 +3169,6 @@ function generateInProgressPanel() {
             <!-- Detail Sections -->
             <div class="status-details">
                 ${generateApprovalSection(approvalStep)}
-                ${generateLegalFormsSection(legalStep)}
                 ${generateFilingSection(filingStep)}
                 ${generateEntitiesSection(entitiesStep)}
             </div>
@@ -3319,51 +3251,22 @@ function generateApprovalSection(step) {
                 `).join('')}
             </div>
             ` : ''}
-        </section>
-    `;
-}
-
-function generateLegalFormsSection(step) {
-    if (step.status === 'pending') return '';
-    
-    const completedDocs = step.documents.filter(d => d.status === 'completed').length;
-    
-    return `
-        <section class="status-detail-section">
-            <div class="detail-section-header">
-                <h4 class="detail-section-title">Legal Forms</h4>
-                <span class="detail-section-badge ${step.status === 'completed' ? 'badge-complete' : 'badge-progress'}">${completedDocs}/${step.documents.length}</span>
-            </div>
             
-            <!-- Document status rows -->
-            <div class="doc-status-list">
-                ${step.documents.map(doc => `
-                    <div class="doc-status-row ${doc.status}">
-                        <div class="doc-status-indicator">${getStatusIcon(doc.status)}</div>
-                        <span class="doc-status-name">${doc.name}</span>
-                        <span class="doc-status-label">${
-                            doc.status === 'completed' ? 'Signed' : 
-                            doc.status === 'in_progress' ? 'In progress' : 
-                            'Pending'
-                        }</span>
-                        ${doc.status === 'completed' && doc.docLink 
-                            ? `<button class="doc-view-btn" onclick="event.preventDefault(); openDocumentFromWorkflow('${doc.docLink}');">View</button>`
+            <!-- Board Resolution Document (signed after approval) -->
+            ${step.boardResolution && step.status === 'completed' ? `
+            <div style="margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-gray-100);">
+                <label style="display: block; font-size: var(--text-xs); font-weight: 600; color: var(--color-gray-500); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-2);">Documents</label>
+                <div class="doc-status-list">
+                    <div class="doc-status-row completed">
+                        <div class="doc-status-indicator">${getStatusIcon('completed')}</div>
+                        <span class="doc-status-name">${step.boardResolution.name}</span>
+                        <span class="doc-status-label">Signed</span>
+                        ${step.boardResolution.docLink 
+                            ? `<button class="doc-view-btn" onclick="event.preventDefault(); openDocumentFromWorkflow('${step.boardResolution.docLink}');">View</button>`
                             : ''
                         }
                     </div>
-                `).join('')}
-            </div>
-            
-            <!-- Activity log -->
-            ${step.substeps.length > 0 ? `
-            <div class="status-substeps">
-                ${step.substeps.map(substep => `
-                    <div class="status-substep-row ${substep.status}">
-                        ${getStatusIcon(substep.status)}
-                        <span class="status-substep-label">${substep.name}</span>
-                        ${substep.time ? `<span class="status-substep-time">${substep.time}</span>` : ''}
-                    </div>
-                `).join('')}
+                </div>
             </div>
             ` : ''}
         </section>
@@ -3385,10 +3288,10 @@ function generateFilingSection(step) {
             
             ${step.status === 'completed' 
                 ? `<div class="filing-card">
-                    <p class="filing-card-text" style="margin-bottom: 0;">Documents have been filed.</p>
+                    <p class="filing-card-text" style="margin-bottom: 0;">Documents have been filed with the regulatory body.</p>
                   </div>`
                 : `<div class="filing-card">
-                    <p class="filing-card-text">Signed documents are ready to file. Use the filing options in the chat to e-File with ACRA or download documents to file manually.</p>
+                    <p class="filing-card-text">File the signed Board Resolution and Form 45 with the regulatory body. Use the filing button in the chat to confirm when complete.</p>
                   </div>`
             }
         </section>
@@ -3650,10 +3553,9 @@ function simulateLiveUpdates() {
         ...approverTimeMap
     };
     
-    // Build updates for the new workflow structure (sped up for demo: ~10 seconds total)
+    // Build updates for the simplified workflow (sped up for demo: ~10 seconds total)
     const updates = [];
     let approvalDelay = 500; // Track approval timeline
-    let legalDelay = 500; // Track legal forms timeline (runs in parallel)
     let approverUpdates = [];
     
     // APPROVAL STEP UPDATES (approvalStep already declared above)
@@ -3693,7 +3595,7 @@ function simulateLiveUpdates() {
                 approvalDelay += 1500; // 1.5s between each approver
             });
             
-            // Mark approval step complete and update vote count
+            // Mark approval step complete and update vote count, then mark Board Resolution as signed
             updates.push({
                 type: 'step-complete',
                 stepId: 'approval',
@@ -3701,6 +3603,14 @@ function simulateLiveUpdates() {
                 substepStatus: 'completed',
                 stepStatus: 'completed',
                 voteCount: `${approvers.length}/${approvers.length} Approved`,
+                delay: approvalDelay
+            });
+            approvalDelay += 300;
+            
+            // Mark Board Resolution as signed
+            updates.push({
+                type: 'board-resolution-signed',
+                stepId: 'approval',
                 delay: approvalDelay
             });
             approvalDelay += 300;
@@ -3726,137 +3636,14 @@ function simulateLiveUpdates() {
                 delay: approvalDelay
             });
             approvalDelay += 300;
-            
-            // START LEGAL FORMS IMMEDIATELY after approval-send completes
-            if (substep.id === 'approval-send') {
-                legalDelay = approvalDelay; // Sync legal forms to start now
-            }
         }
     });
     
-    // LEGAL FORMS STEP UPDATES (starts immediately, runs in parallel with approvals)
-    const legalStep = processSteps.find(s => s.id === 'legal-forms');
-    
-    // Start drafting forms immediately (parallel with approvals)
-    updates.push({
-        type: 'step-start',
-        stepId: 'legal-forms',
-        status: 'in_progress',
-        delay: legalDelay
-    });
-    legalDelay += 300; // 0.3s
-    
-    // Draft Board Resolution and Consent immediately
-    updates.push({
-        type: 'document',
-        stepId: 'legal-forms',
-        documentId: 'board-resolution',
-        status: 'in_progress',
-        delay: legalDelay
-    });
-    legalDelay += 400; // 0.4s
-    
-    updates.push({
-        type: 'document',
-        stepId: 'legal-forms',
-        documentId: 'board-resolution',
-        status: 'completed',
-        docLink: 'board-resolution-signed',
-        delay: legalDelay
-    });
-    legalDelay += 300; // 0.3s
-    
-    // Consent to Act removed from automated workflow - just recorded as yes/no
-    
-    // Process first 2 substeps (draft, send)
-    legalStep.substeps.slice(0, 2).forEach((substep, idx) => {
-        if (substep.status === 'completed') return;
-        
-        updates.push({
-            type: 'substep',
-            stepId: 'legal-forms',
-            substepId: substep.id,
-            status: 'in_progress',
-            delay: legalDelay
-        });
-        legalDelay += 300; // 0.3s
-        
-        updates.push({
-            type: 'substep',
-            stepId: 'legal-forms',
-            substepId: substep.id,
-            status: 'completed',
-            time: idx === 0 ? 'Jan 9, 10:00 AM' : 'Jan 9, 10:30 AM',
-            delay: legalDelay
-        });
-        legalDelay += 300; // 0.3s
-    });
-    
-    // Regulatory form (Form 45) - wait for approval to complete first
-    const approvalCompleteDelay = approverUpdates.length > 0 
-        ? approverUpdates[approverUpdates.length - 1].delay + 300 
-        : legalDelay;
-    legalDelay = Math.max(legalDelay, approvalCompleteDelay);
-    
-    updates.push({
-        type: 'document',
-        stepId: 'legal-forms',
-        documentId: 'regulatory-form',
-        status: 'in_progress',
-        delay: legalDelay
-    });
-    legalDelay += 400; // 0.4s
-    
-    // Process remaining substeps (receive, validate)
-    legalStep.substeps.slice(2).forEach((substep, idx) => {
-        if (substep.status === 'completed') return;
-        
-        updates.push({
-            type: 'substep',
-            stepId: 'legal-forms',
-            substepId: substep.id,
-            status: 'in_progress',
-            delay: legalDelay
-        });
-        legalDelay += 300; // 0.3s
-        
-        updates.push({
-            type: 'substep',
-            stepId: 'legal-forms',
-            substepId: substep.id,
-            status: 'completed',
-            time: idx === 0 ? 'Jan 10, 2:15 PM' : 'Jan 10, 2:30 PM',
-            delay: legalDelay
-        });
-        legalDelay += 300; // 0.3s
-    });
-    
-    // Complete regulatory form
-    updates.push({
-        type: 'document',
-        stepId: 'legal-forms',
-        documentId: 'regulatory-form',
-        status: 'completed',
-        docLink: 'regulatory-form-signed',
-        delay: legalDelay
-    });
-    legalDelay += 300; // 0.3s
-    
-    // Mark legal forms complete
-    updates.push({
-        type: 'step-complete',
-        stepId: 'legal-forms',
-        status: 'completed',
-        delay: legalDelay
-    });
-    legalDelay += 300; // 0.3s
-    
-    // Send chat message about filing (use max of approval or legal delay)
-    const finalDelay = Math.max(approvalDelay, legalDelay);
+    // Send chat message about filing (after approval completes)
     updates.push({
         type: 'chat-message',
         message: 'ready-to-file',
-        delay: finalDelay
+        delay: approvalDelay
     });
     
     // Mark filing step as ready (user must manually file)
@@ -3864,13 +3651,13 @@ function simulateLiveUpdates() {
         type: 'step-start',
         stepId: 'filing',
         status: 'in_progress',
-        delay: finalDelay + 500
+        delay: approvalDelay + 500
     });
     
-    // Sort all updates by delay to ensure correct chronological order (since we have parallel timelines)
+    // Sort all updates by delay to ensure correct chronological order
     updates.sort((a, b) => a.delay - b.delay);
     
-    // Simulate progress through updates
+    // Apply updates sequentially
     let updateIndex = 0;
     
     function applyUpdate() {
@@ -3927,6 +3714,7 @@ function simulateLiveUpdates() {
                 break;
                 
             case 'document':
+                // Legacy handler - no longer used in simplified workflow
                 if (step && step.documents) {
                     const doc = step.documents.find(d => d.id === update.documentId);
                     if (doc) {
@@ -3936,41 +3724,35 @@ function simulateLiveUpdates() {
                 }
                 break;
                 
+            case 'board-resolution-signed':
+                // Mark the Board Resolution as signed in the approval step
+                if (step && step.boardResolution) {
+                    step.boardResolution.status = 'completed';
+                    step.boardResolution.docLink = 'board-resolution-signed';
+                }
+                break;
+                
             case 'chat-message':
                 if (update.message === 'ready-to-file' && currentChatId) {
-                    const legalStep = processSteps.find(s => s.id === 'legal-forms');
-                    const filingStep = processSteps.find(s => s.id === 'filing');
-                    const filingMethod = filingStep.filingMethod === 'e-file' ? 'e-file' : 'manually file';
-                    
                     addMessageToChat(currentChatId, 'assistant',
                         `<div class="workflow-update">
-                            <h4 style="color: var(--color-gray-900); margin-bottom: var(--space-2);">✓ Documents Ready for Filing</h4>
+                            <h4 style="color: var(--color-gray-900); margin-bottom: var(--space-2);">✓ Board Resolution Approved</h4>
                             <p style="color: var(--color-gray-700); margin-bottom: var(--space-3);">
-                                All approvals have been received and legal documents have been signed. You're now ready to file with the regulatory body.
+                                All approvals have been received and the Board Resolution has been signed. Please file the signed Board Resolution along with the Form 45 with the regulatory body.
                             </p>
-                            <div class="filing-actions" style="margin-top: var(--space-3);">
-                                ${filingMethod === 'e-file' ? `
-                                <button class="filing-action-btn filing-action-primary" onclick="eFileDocument()">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                        <polyline points="17 8 12 3 7 8"></polyline>
-                                        <line x1="12" y1="3" x2="12" y2="15"></line>
-                                    </svg>
-                                    E-File with ACRA
-                                </button>
-                                ` : ''}
-                                <button class="filing-action-btn filing-action-secondary" onclick="downloadFilingDocuments()">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                        <polyline points="7 10 12 15 17 10"></polyline>
-                                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                                    </svg>
-                                    Download &amp; File Manually
-                                </button>
-                            </div>
+                            <p style="color: var(--color-gray-600); font-size: var(--text-sm); margin-bottom: var(--space-3);">
+                                Once you've filed the documents, click the button below to update the entities system.
+                            </p>
+                            <button class="filing-action-btn filing-action-primary" onclick="confirmFilingComplete()" style="width: 100%;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                I've Filed the Documents
+                            </button>
                         </div>`
                     );
                 }
+                break;
                 break;
         }
         
@@ -3995,8 +3777,8 @@ function simulateLiveUpdates() {
     }
 }
 
-function eFileDocument() {
-    // Disable filing buttons in chat
+function confirmFilingComplete() {
+    // Disable filing button in chat
     disablePreviousChatInteractions();
     
     // Mark filing as complete
@@ -4012,27 +3794,16 @@ function eFileDocument() {
     }
     
     // Start entities update
-    startEntitiesUpdate('e-file');
+    startEntitiesUpdate('manual');
+}
+
+// LEGACY FUNCTIONS - Redirect to confirmFilingComplete
+function eFileDocument() {
+    confirmFilingComplete();
 }
 
 function downloadFilingDocuments() {
-    // Disable filing buttons in chat
-    disablePreviousChatInteractions();
-    
-    // Mark filing as complete
-    const filingStep = processSteps.find(s => s.id === 'filing');
-    if (filingStep) {
-        filingStep.status = 'completed';
-    }
-    
-    // Refresh panel to show filing complete
-    if (chatView.classList.contains('show-right-panel')) {
-        const panelContent = document.querySelector('.right-panel-content');
-        panelContent.innerHTML = generateInProgressPanel();
-    }
-    
-    // Start entities update
-    startEntitiesUpdate('download');
+    confirmFilingComplete();
 }
 
 function downloadConsentTemplate() {
@@ -4202,11 +3973,6 @@ function generateCompletionPanel() {
                 <div class="stepper-connector active"></div>
                 <div class="stepper-step completed">
                     <div class="stepper-dot">${getStepperIcon('completed')}</div>
-                    <div class="stepper-label">Legal Forms</div>
-                </div>
-                <div class="stepper-connector active"></div>
-                <div class="stepper-step completed">
-                    <div class="stepper-dot">${getStepperIcon('completed')}</div>
                     <div class="stepper-label">Filing</div>
                 </div>
                 <div class="stepper-connector active"></div>
@@ -4243,7 +4009,6 @@ function generateCompletionPanel() {
             <!-- Completed Steps Detail -->
             <div class="status-details" style="flex: 1; overflow-y: auto;">
                 ${generateApprovalSection(processSteps.find(s => s.id === 'approval'))}
-                ${generateLegalFormsSection(processSteps.find(s => s.id === 'legal-forms'))}
                 ${generateFilingSection(processSteps.find(s => s.id === 'filing'))}
                 ${generateEntitiesSection(processSteps.find(s => s.id === 'entities'))}
             </div>
