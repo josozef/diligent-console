@@ -1691,27 +1691,21 @@ function handleAddPersonFormSubmit() {
         addMessageToChat(currentChatId, 'user', `Added ${fullName} to the Entities system`);
         
         setTimeout(() => {
-            addMessageToChat(currentChatId, 'assistant', 
-                `Great! I've added <strong>${fullName}</strong> (${newPerson.title}) to the Entities system. Now, do you have a Consent to Act for this appointee?`
-            );
-            
-            // Show the consent to act question as a separate chat step
-            setTimeout(() => {
-                const consentUI = `
-                    <div class="hybrid-form" id="newPersonConsentForm">
-                        <div class="form-field">
-                            <label class="form-label">Do you have a Consent to Act for this appointee?</label>
-                            <div class="consent-toggle" id="newPersonConsentToggle">
-                                <button type="button" class="consent-btn" data-value="yes" id="newPersonConsentYes">Yes</button>
-                                <button type="button" class="consent-btn" data-value="no" id="newPersonConsentNo">No</button>
-                            </div>
+            const consentUI = `
+                <p style="margin-bottom: var(--space-4);">Great! I've added <strong>${fullName}</strong> (${newPerson.title}) to the Entities system. Now, do you have a Consent to Act for this appointee?</p>
+                <div class="hybrid-form" id="newPersonConsentForm">
+                    <div class="form-field">
+                        <label class="form-label">Do you have a Consent to Act for this appointee?</label>
+                        <div class="consent-toggle" id="newPersonConsentToggle">
+                            <button type="button" class="consent-btn" data-value="yes" id="newPersonConsentYes">Yes</button>
+                            <button type="button" class="consent-btn" data-value="no" id="newPersonConsentNo">No</button>
                         </div>
                     </div>
-                `;
-                addMessageToChat(currentChatId, 'assistant', consentUI);
-                
-                // Wire up the consent buttons after they're in the DOM
-                setTimeout(() => {
+                </div>
+            `;
+            addMessageToChat(currentChatId, 'assistant', consentUI);
+            
+            setTimeout(() => {
                     const consentForms = document.querySelectorAll('#newPersonConsentForm');
                     const consentForm = consentForms[consentForms.length - 1];
                     if (!consentForm) return;
@@ -1753,7 +1747,6 @@ function handleAddPersonFormSubmit() {
                     if (yesBtn) yesBtn.addEventListener('click', () => handleConsentChoice('yes'));
                     if (noBtn) noBtn.addEventListener('click', () => handleConsentChoice('no'));
                 }, 150);
-            }, 600);
         }, 400);
     }
 }
