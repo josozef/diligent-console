@@ -2045,7 +2045,7 @@ function generateAppointmentPanelContent() {
 
             <!-- Action Section -->
             <section class="panel-section-flush panel-actions" id="panelActions">
-                <!-- Start Workflow button will appear when approvers and documents are confirmed -->
+                <!-- Start Approval Process button will appear when approvers and documents are confirmed -->
             </section>
         </div>
     `;
@@ -2249,7 +2249,7 @@ function confirmApprovers() {
     // Mark documents as reviewed (no separate confirmation needed)
     window.appointmentWorkflowState.documentsReviewed = true;
     
-    // Enable Start Workflow button in preview panel
+    // Enable Start Approval Process button in preview panel
     updateStartProcessButton();
 
     // Acknowledge in chat with combined message
@@ -2281,13 +2281,13 @@ function confirmApprovers() {
                 </ul>
             </div>
             <p style="color: var(--color-gray-700); margin-bottom: var(--space-3);">
-                Please review the documents in the preview panel before starting the workflow. When you're ready, click <strong>Start Workflow</strong> below or in the preview panel.
+                Please review the documents in the preview panel before starting the workflow. When you're ready, click <strong>Start Approval Process</strong> below or in the preview panel.
             </p>
             <button class="panel-btn-primary" onclick="startAppointmentWorkflow()" style="margin-top: var(--space-2);">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
-                Start Workflow
+                Start Approval Process
             </button>`
         );
     }
@@ -2394,7 +2394,7 @@ function addDocumentsToPanel() {
     documentsList.style.display = 'block';
 }
 
-// Update Start Workflow button visibility
+// Update Start Approval Process button visibility
 function updateStartProcessButton() {
     const actionsSection = document.getElementById('panelActions');
     if (!actionsSection) return;
@@ -2407,7 +2407,7 @@ function updateStartProcessButton() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
-                Start Workflow
+                Start Approval Process
             </button>
         `;
         
@@ -2662,7 +2662,7 @@ function initializeReplacementAppointeeSearch() {
 }
 
 function startAppointmentWorkflow() {
-    // Disable the Start Workflow button that was just clicked
+    // Disable the Start Approval Process button that was just clicked
     if (event && event.target) {
         const btn = event.target.closest('button');
         if (btn) {
