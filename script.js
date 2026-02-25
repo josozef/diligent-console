@@ -2045,7 +2045,7 @@ function generateAppointmentPanelContent() {
 
             <!-- Action Section -->
             <section class="panel-section-flush panel-actions" id="panelActions">
-                <!-- Start Agent button will appear when approvers and documents are confirmed -->
+                <!-- Start Workflow button will appear when approvers and documents are confirmed -->
             </section>
         </div>
     `;
@@ -2243,20 +2243,53 @@ function confirmApprovers() {
     // Add to preview panel
     addApproversToPanel(selectedApprovers);
     
-    // Acknowledge in chat
+    // Add documents to panel immediately
+    addDocumentsToPanel();
+    
+    // Mark documents as reviewed (no separate confirmation needed)
+    window.appointmentWorkflowState.documentsReviewed = true;
+    
+    // Enable Start Workflow button in preview panel
+    updateStartProcessButton();
+
+    // Acknowledge in chat with combined message
     if (currentChatId) {
         const approverNames = selectedApprovers.map(a => a.name).join(', ');
         addMessageToChat(currentChatId, 'assistant', 
             `<p style="color: var(--color-gray-700); margin-bottom: var(--space-3);">
                 <strong>${selectedApprovers.length} approver${selectedApprovers.length > 1 ? 's' : ''} confirmed:</strong> ${approverNames}
-            </p>`
+            </p>
+            <p style="color: var(--color-gray-700); margin-bottom: var(--space-3);">
+                The following documents have been generated and added to the preview panel for your review:
+            </p>
+            <div style="background: var(--color-gray-50); padding: var(--space-3); border-radius: var(--radius-lg); margin-bottom: var(--space-4);">
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-2);">
+                    <li style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-gray-700);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <span>Board Resolution</span>
+                    </li>
+                    <li style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-gray-700);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <span>Form 45 — Consent to Act as Director</span>
+                    </li>
+                </ul>
+            </div>
+            <p style="color: var(--color-gray-700); margin-bottom: var(--space-3);">
+                Please review the documents in the preview panel before starting the workflow. When you're ready, click <strong>Start Workflow</strong> below or in the preview panel.
+            </p>
+            <button class="panel-btn-primary" onclick="startAppointmentWorkflow()" style="margin-top: var(--space-2);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                Start Workflow
+            </button>`
         );
-        
-        // Add documents to panel and prompt for review
-        setTimeout(() => {
-            addDocumentsToPanel();
-            addMessageToChat(currentChatId, 'assistant', generateDocumentReviewUI());
-        }, 500);
     }
 }
 
@@ -2286,31 +2319,10 @@ function generateDocumentReviewUI() {
     `;
 }
 
-// Handle document review confirmation
+// Legacy — no longer called as a separate step
 function confirmDocumentsReviewed() {
-    // Disable the document review buttons
-    disablePreviousChatInteractions();
-    
-    // Mark documents as reviewed
     window.appointmentWorkflowState.documentsReviewed = true;
-    
-    // Enable Start Agent button if both conditions are met
     updateStartProcessButton();
-    
-    // Acknowledge in chat with Start Agent button
-    if (currentChatId) {
-        addMessageToChat(currentChatId, 'assistant', 
-            `<p style="color: var(--color-gray-700); margin-bottom: var(--space-3);">
-                <strong>Documents confirmed.</strong> Everything looks good. When you're ready, start the agent to begin the appointment workflow.
-            </p>
-            <button class="panel-btn-primary" onclick="startAppointmentWorkflow()" style="margin-top: var(--space-2);">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
-                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
-                Start Agent
-            </button>`
-        );
-    }
 }
 
 // New function to add approvers section to panel
@@ -2347,7 +2359,6 @@ function addDocumentsToPanel() {
     // Hide empty state
     emptyState.style.display = 'none';
     
-    // Only show Board Resolution (Form 45 assumed already signed offline)
     documentsList.innerHTML = `
         <div class="doc-compact-item">
             <div class="doc-compact-info">
@@ -2357,13 +2368,33 @@ function addDocumentsToPanel() {
                 </svg>
                 <span class="doc-compact-name">Board Resolution</span>
             </div>
-            <button class="doc-review-btn" onclick="previewDocument('board-resolution')">Review</button>
+            <div class="doc-compact-actions">
+                <button class="doc-review-btn" onclick="downloadDocument('board-resolution')" title="Download">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                </button>
+                <button class="doc-review-btn" onclick="previewDocument('board-resolution')">Review</button>
+            </div>
+        </div>
+        <div class="doc-compact-item">
+            <div class="doc-compact-info">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="doc-compact-icon">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                <span class="doc-compact-name">Form 45 — Consent to Act as Director</span>
+            </div>
+            <div class="doc-compact-actions">
+                <button class="doc-review-btn" onclick="downloadDocument('form-45')" title="Download">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                </button>
+                <button class="doc-review-btn" onclick="previewDocument('form-45')">Review</button>
+            </div>
         </div>
     `;
     documentsList.style.display = 'block';
 }
 
-// Update Start Agent button visibility
+// Update Start Workflow button visibility
 function updateStartProcessButton() {
     const actionsSection = document.getElementById('panelActions');
     if (!actionsSection) return;
@@ -2376,7 +2407,7 @@ function updateStartProcessButton() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: var(--space-1);">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
-                Start Agent
+                Start Workflow
             </button>
         `;
         
@@ -2631,7 +2662,7 @@ function initializeReplacementAppointeeSearch() {
 }
 
 function startAppointmentWorkflow() {
-    // Disable the Start Agent button that was just clicked
+    // Disable the Start Workflow button that was just clicked
     if (event && event.target) {
         const btn = event.target.closest('button');
         if (btn) {
@@ -3393,20 +3424,40 @@ function simulateLiveUpdates() {
                 
             case 'chat-message':
                 if (update.message === 'ready-to-file' && currentChatId) {
+                    const { company, appointee } = window.selectedAppointment || {};
+                    const companyName = company ? company.name : 'the company';
+                    const appointeeName = appointee ? appointee.name : 'the appointee';
                     addMessageToChat(currentChatId, 'assistant',
                         `<div class="workflow-update">
-                            <h4 style="color: var(--color-gray-900); margin-bottom: var(--space-2);">✓ Board Resolution Approved</h4>
+                            <h4 style="color: var(--color-gray-900); margin-bottom: var(--space-3);">✓ Resolution Approved</h4>
                             <p style="color: var(--color-gray-700); margin-bottom: var(--space-3);">
-                                All approvals have been received and the Board Resolution has been signed. Please file the signed Board Resolution along with the Form 45 with the regulatory body.
+                                Your board resolution has been approved. Download and file your regulatory form (Form 45) with the appropriate regulatory authority.
                             </p>
-                            <p style="color: var(--color-gray-600); font-size: var(--text-sm); margin-bottom: var(--space-3);">
-                                Once you've filed the documents, click the button below to update the entities system.
+                            <div style="display: flex; gap: var(--space-2); margin-bottom: var(--space-4);">
+                                <button class="doc-review-btn" onclick="downloadDocument('regulatory-form')" style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm);">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    Download Form 45
+                                </button>
+                                <button class="doc-review-btn" onclick="downloadDocument('board-resolution')" style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm);">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    Download Board Resolution
+                                </button>
+                            </div>
+                            <p style="color: var(--color-gray-700); margin-bottom: var(--space-2);">
+                                When you complete filing, the following entities will be updated:
                             </p>
+                            <ul style="list-style: none; padding: 0; margin: 0 0 var(--space-4) 0; display: flex; flex-direction: column; gap: var(--space-2);">
+                                <li style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-gray-700);">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-gray-400)" stroke-width="2" style="flex-shrink: 0;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                    <span><strong>${appointeeName}</strong> — added as Director</span>
+                                </li>
+                                <li style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-gray-700);">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-gray-400)" stroke-width="2" style="flex-shrink: 0;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                                    <span><strong>${companyName}</strong> — board membership updated</span>
+                                </li>
+                            </ul>
                             <button class="filing-action-btn filing-action-primary" onclick="confirmFilingComplete()" style="width: 100%;">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
-                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                </svg>
-                                I've Filed the Documents
+                                Complete Workflow
                             </button>
                         </div>`
                     );
