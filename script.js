@@ -333,7 +333,9 @@ function createNewChat(initialMessage) {
         updateChatTitle(chat.title);
         clearChatThread();
         
-        // Focus the chat input
+        // Show brief welcome description of the process and required data
+        const welcomeContent = getChatWelcomeDescription();
+        addMessageToChat(chatId, 'assistant', welcomeContent);
         chatInput.focus();
         return;
     }
@@ -554,7 +556,7 @@ function appendMessageToThread(message) {
     chatThread.appendChild(messageEl);
     
     // Initialize form if present
-    if (message.content.includes('appointDirectorForm') || message.content.includes('companySelectionForm') || message.content.includes('appointeeSelectionForm')) {
+    if (message.content.includes('appointDirectorForm') || message.content.includes('companySelectionForm') || message.content.includes('appointeeSelectionForm') || message.content.includes('appointmentSetupForm')) {
         setTimeout(() => {
             initializeAppointDirectorForm();
             // Scroll after form initialization
@@ -829,6 +831,47 @@ if (closeRightPanel && chatView) {
 }
 
 // ============================================
+// CHAT WELCOME
+// ============================================
+
+function getChatWelcomeDescription() {
+    return `
+        <div class="chat-welcome-description">
+            <p style="margin-bottom: var(--space-2); color: var(--color-gray-700); line-height: var(--leading-normal);">
+                I can help you run board and governance workflows. To get started, tell me what you need—for example <strong>Appoint a Director</strong>.
+            </p>
+            <p style="color: var(--color-gray-600); font-size: var(--text-sm); line-height: var(--leading-normal);">
+                For a director appointment I'll need: the <strong>company</strong>, the <strong>appointee</strong>, whether you have <strong>Consent to Act</strong>, and the <strong>effective date</strong>. You can search or add new individuals as needed.
+            </p>
+        </div>
+    `;
+}
+
+function getAppointmentIntroMessage() {
+    return `
+        <p style="margin-bottom: var(--space-3); color: var(--color-gray-700); line-height: var(--leading-normal);">
+            I'll walk you through the director appointment process. Here's how it works:
+        </p>
+        <ol style="margin: 0 0 var(--space-4) var(--space-4); padding: 0; color: var(--color-gray-600); font-size: var(--text-sm); line-height: 1.9;">
+            <li><strong>Approval</strong> — generate a Board Resolution and send it to board members for approval</li>
+            <li><strong>Filing</strong> — file the signed resolution and required forms with the regulatory body</li>
+            <li><strong>Update Entities</strong> — record the appointment in the entity management system</li>
+        </ol>
+        <p style="margin: 0; color: var(--color-gray-600); font-size: var(--text-sm); line-height: var(--leading-normal);">
+            To get started I'll need the <strong>Company</strong>, <strong>Appointee</strong>, <strong>Consent to Act</strong> status, and <strong>Effective Date</strong>.
+        </p>
+    `;
+}
+
+function scheduleAppointmentForm() {
+    setTimeout(() => {
+        if (!currentChatId) return;
+        const response = generateAppointDirectorForm('add');
+        addMessageToChat(currentChatId, 'assistant', response);
+    }, 600);
+}
+
+// ============================================
 // HERO VIEW HANDLERS (existing)
 // ============================================
 
@@ -873,14 +916,14 @@ function generateResponse(message) {
             </div>
         `;
     } else if (lowerMessage.includes('replace') && lowerMessage.includes('director') && (lowerMessage.includes('david') || lowerMessage.includes('chen'))) {
-        // HIDDEN: Replace director flow disabled for now - route to Add flow
-        return generateAppointDirectorForm('add');
+        scheduleAppointmentForm();
+        return getAppointmentIntroMessage();
     } else if (lowerMessage.includes('appoint') && lowerMessage.includes('director')) {
-        // All director appointment prompts go to Add New Director flow
-        return generateAppointDirectorForm('add');
+        scheduleAppointmentForm();
+        return getAppointmentIntroMessage();
     } else if ((lowerMessage.includes('replace') || lowerMessage.includes('add')) && (lowerMessage.includes('director') || lowerMessage.includes('board'))) {
-        // All director-related messages go to Add New Director flow
-        return generateAppointDirectorForm('add');
+        scheduleAppointmentForm();
+        return getAppointmentIntroMessage();
     } else if (lowerMessage.includes('open') && lowerMessage.includes('application')) {
         return `
             <h3 style="margin-bottom: var(--space-3); color: var(--color-gray-900);">Recent Applications</h3>
@@ -1191,21 +1234,28 @@ function generateAddPersonForm(step = 1, formData = {}) {
 }
 
 function generateAppointDirectorForm(appointmentType = 'replace', savedState = {}, newlyAddedPerson = null) {
-    // Step 1: Ask for company only
-    return generateCompanySelectionStep();
+    return generateAppointmentSetupStep();
 }
 
-function generateCompanySelectionStep() {
+// Consolidated single step: Company, Appointee, Consent to Act, Effective Date.
+// When company/appointee are provided, show as chips; otherwise show search fields.
+function generateAppointmentSetupStep(company = null, appointee = null, consent = null, effectiveDate = '') {
+    const hasCompany = company && company.id;
+    const hasAppointee = appointee && appointee.id;
+    const consentVal = consent === true ? 'yes' : consent === false ? 'no' : '';
+    const today = new Date().toISOString().slice(0, 10);
     return `
         <h3 style="margin-bottom: var(--space-3); color: var(--color-gray-900);">Add a New Director</h3>
         <p style="margin-bottom: var(--space-5); line-height: var(--leading-normal); color: var(--color-gray-700);">
-            Which company will this director be appointed to?
+            ${hasCompany && hasAppointee
+                ? 'Review your selections and complete Consent to Act and Effective Date, then continue.'
+                : 'Select the company and appointee, then confirm Consent to Act and the effective date.'}
         </p>
         
-        <form id="companySelectionForm" class="hybrid-form">
+        <form id="appointmentSetupForm" class="hybrid-form" data-company-id="${hasCompany ? company.id : ''}">
             <div class="form-field">
                 <label class="form-label">Company</label>
-                <div class="search-field-wrapper">
+                <div class="search-field-wrapper" style="display: ${hasCompany ? 'none' : 'block'};">
                     <input 
                         type="text" 
                         id="companySearch" 
@@ -1214,45 +1264,13 @@ function generateCompanySelectionStep() {
                         autocomplete="off"
                     />
                     <div class="search-results" id="companyResults"></div>
-                    <input type="hidden" id="selectedCompanyId" value="" />
+                    <input type="hidden" id="selectedCompanyId" value="${hasCompany ? company.id : ''}" />
                 </div>
-                <div class="selected-item" id="selectedCompany" style="display: none;"></div>
-            </div>
-
-            <div class="form-actions">
-                <button type="button" class="form-btn-secondary" id="cancelFormBtn">Cancel</button>
-                <button type="submit" class="form-btn-primary" id="submitCompanyBtn" disabled>Continue</button>
-            </div>
-        </form>
-    `;
-}
-
-function generateAppointeeSelectionStep(company, preSelectedAppointee = null) {
-    return `
-        <p style="margin-bottom: var(--space-5); line-height: var(--leading-normal); color: var(--color-gray-700);">
-            Who will be appointed as a new director to <strong>${company.flag} ${company.name}</strong>?
-        </p>
-        
-        <form id="appointeeSelectionForm" class="hybrid-form" data-company-id="${company.id}">
-            <div class="form-field">
-                <label class="form-label">Appointee</label>
-                <div class="search-field-wrapper">
-                    <input 
-                        type="text" 
-                        id="appointeeSearch" 
-                        class="search-input"
-                        placeholder="Search for appointee..."
-                        autocomplete="off"
-                        style="${preSelectedAppointee ? 'display: none;' : ''}"
-                    />
-                    <div class="search-results" id="appointeeResults"></div>
-                    <input type="hidden" id="selectedAppointeeId" value="${preSelectedAppointee ? preSelectedAppointee.id : ''}" />
-                </div>
-                <div class="selected-item" id="selectedAppointee" style="display: ${preSelectedAppointee ? 'block' : 'none'};">
-                    ${preSelectedAppointee ? `
+                <div class="selected-item" id="selectedCompany" style="display: ${hasCompany ? 'block' : 'none'};">
+                    ${hasCompany ? `
                         <div class="selected-chip">
-                            <span>${preSelectedAppointee.name}</span>
-                            <button type="button" class="remove-chip" onclick="clearSelection('selectedAppointee', 'appointeeSearch', 'appointeeResults')">
+                            <span>${company.flag} ${company.name}</span>
+                            <button type="button" class="remove-chip" data-clear="selectedCompany,companySearch,companyResults">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="18" y1="6" x2="6" y2="18"></line>
                                     <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -1263,46 +1281,71 @@ function generateAppointeeSelectionStep(company, preSelectedAppointee = null) {
                 </div>
             </div>
 
-            <!-- Consent to Act -->
-            <div class="form-field" id="consentField" style="display: none;">
+            <div class="form-field">
+                <label class="form-label">Appointee</label>
+                <div class="search-field-wrapper" style="display: ${hasAppointee ? 'none' : 'block'};">
+                    <input 
+                        type="text" 
+                        id="appointeeSearch" 
+                        class="search-input"
+                        placeholder="Search for appointee..."
+                        autocomplete="off"
+                    />
+                    <div class="search-results" id="appointeeResults"></div>
+                    <input type="hidden" id="selectedAppointeeId" value="${hasAppointee ? appointee.id : ''}" />
+                </div>
+                <div class="selected-item" id="selectedAppointee" style="display: ${hasAppointee ? 'block' : 'none'};">
+                    ${hasAppointee ? `
+                        <div class="selected-chip">
+                            <span>${appointee.name}</span>
+                            <button type="button" class="remove-chip" data-clear="selectedAppointee,appointeeSearch,appointeeResults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+
+            <div class="form-field">
                 <label class="form-label">Do you have a Consent to Act for this appointee?</label>
                 <div class="consent-toggle" id="consentToggle">
-                    <button type="button" class="consent-btn" data-value="yes" id="consentYesBtn">Yes</button>
-                    <button type="button" class="consent-btn" data-value="no" id="consentNoBtn">No</button>
+                    <button type="button" class="consent-btn ${consentVal === 'yes' ? 'consent-btn-active' : ''}" data-value="yes" id="consentYesBtn">Yes</button>
+                    <button type="button" class="consent-btn ${consentVal === 'no' ? 'consent-btn-active' : ''}" data-value="no" id="consentNoBtn">No</button>
                 </div>
-                <input type="hidden" id="hasConsentToAct" value="" />
+                <input type="hidden" id="hasConsentToAct" value="${consentVal}" />
+            </div>
+
+            <div class="form-field">
+                <label class="form-label">Effective Date</label>
+                <input type="date" id="effectiveDate" class="search-input" value="${effectiveDate || today}" />
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="form-btn-primary" id="submitAppointeeBtn" disabled>Continue</button>
+                <button type="button" class="form-btn-secondary" id="cancelFormBtn">Cancel</button>
+                <button type="submit" class="form-btn-primary" id="submitAppointmentSetupBtn" disabled>Continue</button>
             </div>
         </form>
     `;
 }
 
 function initializeAppointDirectorForm() {
-    // Check if this is a company selection step
-    const companyForms = document.querySelectorAll('#companySelectionForm');
-    const companyForm = companyForms[companyForms.length - 1];
-    if (companyForm && !companyForm._initialized) {
-        companyForm._initialized = true;
-        initializeCompanySelectionForm(companyForm);
-        return;
-    }
-    
-    // Check if this is an appointee selection step
-    const appointeeForms = document.querySelectorAll('#appointeeSelectionForm');
-    const appointeeForm = appointeeForms[appointeeForms.length - 1];
-    if (appointeeForm && !appointeeForm._initialized) {
-        appointeeForm._initialized = true;
-        initializeAppointeeSelectionForm(appointeeForm);
+    const setupForms = document.querySelectorAll('#appointmentSetupForm');
+    const form = setupForms[setupForms.length - 1];
+    if (form && !form._initialized) {
+        form._initialized = true;
+        initializeAppointmentSetupForm(form);
         return;
     }
 }
 
-function initializeCompanySelectionForm(form) {
+function initializeAppointmentSetupForm(form) {
     const companySearch = form.querySelector('#companySearch');
-    const submitBtn = form.querySelector('#submitCompanyBtn');
+    const appointeeSearch = form.querySelector('#appointeeSearch');
+    const submitBtn = form.querySelector('#submitAppointmentSetupBtn');
+    const effectiveDateInput = form.querySelector('#effectiveDate');
     
     function getHiddenValue(id) {
         const input = form.querySelector('#' + id);
@@ -1312,110 +1355,85 @@ function initializeCompanySelectionForm(form) {
         const input = form.querySelector('#' + id);
         if (input) input.value = value;
     }
-
-    // Company search
-    setupSearchField(
-        companySearch,
-        form.querySelector('#companyResults'),
-        mockCompanies,
-        (item) => `
-            <div style="display: flex; flex-direction: column; gap: 2px;">
-                <div style="font-weight: 500; color: var(--color-gray-900);">${item.flag} ${item.name}</div>
-                <div style="font-size: var(--text-xs); color: var(--color-gray-500);">${item.location}, ${item.country}</div>
-            </div>
-        `,
-        (item) => {
-            setHiddenValue('selectedCompanyId', item.id);
-            showSelectedItem('selectedCompany', `${item.flag} ${item.name}`, 'companySearch', 'companyResults');
-            submitBtn.disabled = false;
-        }
-    );
-
-    // Form submission — proceed to appointee step
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const companyId = getHiddenValue('selectedCompanyId');
-        const company = mockCompanies.find(c => c.id === companyId);
-        if (!company || !currentChatId) return;
-
-        disableButtonsInElement(form);
-        addMessageToChat(currentChatId, 'user', `${company.flag} ${company.name}`);
-        window.selectedCompanyForAppointment = company;
-
-        setTimeout(() => {
-            const response = generateAppointeeSelectionStep(company);
-            addMessageToChat(currentChatId, 'assistant', response);
-        }, 400);
-    });
-
-    // Cancel button
-    const cancelBtn = form.querySelector('#cancelFormBtn');
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', () => {
-            if (currentChatId) {
-                addMessageToChat(currentChatId, 'assistant', 'No problem. Let me know if you need help with anything else.');
-            }
-        });
-    }
-}
-
-function initializeAppointeeSelectionForm(form) {
-    const appointeeSearch = form.querySelector('#appointeeSearch');
-    const submitBtn = form.querySelector('#submitAppointeeBtn');
-
-    function getHiddenValue(id) {
-        const input = form.querySelector('#' + id);
-        return input ? input.value : '';
-    }
-    function setHiddenValue(id, value) {
-        const input = form.querySelector('#' + id);
-        if (input) input.value = value;
-    }
-
-    setupSearchField(
-        appointeeSearch,
-        form.querySelector('#appointeeResults'),
-        mockAppointees,
-        (item) => `
-            <div style="display: flex; flex-direction: column; gap: 2px;">
-                <div style="font-weight: 500; color: var(--color-gray-900);">${item.name}</div>
-                <div style="font-size: var(--text-xs); color: var(--color-gray-500);">${item.title}</div>
-            </div>
-        `,
-        (item) => {
-            setHiddenValue('selectedAppointeeId', item.id);
-            showSelectedItem('selectedAppointee', item.name, 'appointeeSearch', 'appointeeResults');
-            checkFormCompletion();
-        },
-        {
-            html: `
-                <div style="display: flex; align-items: center; gap: var(--space-2); color: var(--color-gray-900);">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    <span style="font-weight: 500;">Add New Person</span>
-                </div>
-            `,
-            onClick: () => showAddPersonForm('add')
-        }
-    );
-
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        handleAppointeeFormSubmit(form);
-    });
 
     function checkFormCompletion() {
+        const companyId = getHiddenValue('selectedCompanyId');
         const appointeeId = getHiddenValue('selectedAppointeeId');
         const consentValue = getHiddenValue('hasConsentToAct');
-        const consentField = form.querySelector('#consentField');
-        if (consentField) {
-            consentField.style.display = appointeeId ? 'flex' : 'none';
-        }
-        submitBtn.disabled = !(appointeeId && consentValue);
+        const dateVal = effectiveDateInput ? effectiveDateInput.value : '';
+        submitBtn.disabled = !(companyId && appointeeId && consentValue && dateVal);
     }
 
+    // Default consent to "yes" so form can be completed once company + appointee are set
+    if (!getHiddenValue('hasConsentToAct')) {
+        setHiddenValue('hasConsentToAct', 'yes');
+        const consentYes = form.querySelector('#consentYesBtn');
+        if (consentYes) consentYes.classList.add('consent-btn-active');
+    }
+
+    // Company search (always attach so it works after clearing chip)
+    if (companySearch) {
+        setupSearchField(
+            companySearch,
+            form.querySelector('#companyResults'),
+            mockCompanies,
+            (item) => `
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <div style="font-weight: 500; color: var(--color-gray-900);">${item.flag} ${item.name}</div>
+                    <div style="font-size: var(--text-xs); color: var(--color-gray-500);">${item.location}, ${item.country}</div>
+                </div>
+            `,
+            (item) => {
+                setHiddenValue('selectedCompanyId', item.id);
+                window.selectedCompanyForAppointment = mockCompanies.find(c => c.id === item.id);
+                showSelectedItemInForm(form, 'selectedCompany', `${item.flag} ${item.name}`, 'companySearch', 'companyResults');
+                submitBtn.disabled = false;
+                checkFormCompletion();
+            }
+        );
+    }
+
+    // Appointee search (always attach so it works after clearing chip)
+    if (appointeeSearch) {
+        setupSearchField(
+            appointeeSearch,
+            form.querySelector('#appointeeResults'),
+            mockAppointees,
+            (item) => `
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <div style="font-weight: 500; color: var(--color-gray-900);">${item.name}</div>
+                    <div style="font-size: var(--text-xs); color: var(--color-gray-500);">${item.title}</div>
+                </div>
+            `,
+            (item) => {
+                const companyId = getHiddenValue('selectedCompanyId') || form.getAttribute('data-company-id') || window.selectedCompanyForAppointment?.id;
+                const company = mockCompanies.find(c => c.id === companyId);
+                const appointee = mockAppointees.find(a => a.id === item.id) || mockPeople.find(p => p.id === item.id);
+                if (!company || !appointee || !currentChatId) return;
+                disableButtonsInElement(form);
+                addMessageToChat(currentChatId, 'user', `${company.flag} ${company.name} — ${appointee.name}`);
+                window.selectedCompanyForAppointment = company;
+                setTimeout(() => {
+                    const response = generateAppointmentSetupStep(company, appointee);
+                    addMessageToChat(currentChatId, 'assistant', response);
+                }, 400);
+            },
+            {
+                html: `
+                    <div style="display: flex; align-items: center; gap: var(--space-2); color: var(--color-gray-900);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        <span style="font-weight: 500;">Add New Person</span>
+                    </div>
+                `,
+                onClick: () => showAddPersonForm('add')
+            }
+        );
+    }
+
+    // Consent toggle
     const consentYesBtn = form.querySelector('#consentYesBtn');
     const consentNoBtn = form.querySelector('#consentNoBtn');
     if (consentYesBtn) {
@@ -1423,7 +1441,7 @@ function initializeAppointeeSelectionForm(form) {
             e.preventDefault(); e.stopPropagation();
             setHiddenValue('hasConsentToAct', 'yes');
             consentYesBtn.classList.add('consent-btn-active');
-            consentNoBtn.classList.remove('consent-btn-active');
+            if (consentNoBtn) consentNoBtn.classList.remove('consent-btn-active');
             checkFormCompletion();
         });
     }
@@ -1432,20 +1450,97 @@ function initializeAppointeeSelectionForm(form) {
             e.preventDefault(); e.stopPropagation();
             setHiddenValue('hasConsentToAct', 'no');
             consentNoBtn.classList.add('consent-btn-active');
-            consentYesBtn.classList.remove('consent-btn-active');
+            if (consentYesBtn) consentYesBtn.classList.remove('consent-btn-active');
             checkFormCompletion();
+        });
+    }
+
+    if (effectiveDateInput) {
+        effectiveDateInput.addEventListener('change', checkFormCompletion);
+        effectiveDateInput.addEventListener('input', checkFormCompletion);
+    }
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleAppointmentSetupSubmit(form);
+    });
+
+    const cancelBtn = form.querySelector('#cancelFormBtn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            if (currentChatId) {
+                addMessageToChat(currentChatId, 'assistant', 'No problem. Let me know if you need help with anything else.');
+            }
+        });
+    }
+
+    // Bind remove-chip buttons (for pre-rendered chips in re-presented form)
+    form.querySelectorAll('.remove-chip[data-clear]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const parts = this.getAttribute('data-clear').split(',');
+            if (parts.length === 3) clearSelectionInForm(form, parts[0], parts[1], parts[2]);
+        });
+    });
+
+    checkFormCompletion();
+}
+
+function showSelectedItemInForm(form, containerId, text, inputId, resultsId) {
+    const container = form.querySelector('#' + containerId);
+    const input = form.querySelector('#' + inputId);
+    const results = form.querySelector('#' + resultsId);
+    if (!container) return;
+    container.innerHTML = `
+        <div class="selected-chip">
+            <span>${text}</span>
+            <button type="button" class="remove-chip" data-container-id="${containerId}" data-input-id="${inputId}" data-results-id="${resultsId}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+    `;
+    container.style.display = 'block';
+    if (input) { input.style.display = 'none'; input.value = ''; }
+    if (results) results.style.display = 'none';
+    const wrapper = input ? input.closest('.search-field-wrapper') : null;
+    if (wrapper) wrapper.style.display = 'none';
+    const removeBtn = container.querySelector('.remove-chip');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function() {
+            clearSelectionInForm(form, containerId, inputId, resultsId);
         });
     }
 }
 
-function handleAppointeeFormSubmit(form) {
-    const companyId = form.getAttribute('data-company-id') || window.selectedCompanyForAppointment?.id;
-    const company = mockCompanies.find(c => c.id === companyId);
+function clearSelectionInForm(form, containerId, inputId, resultsId) {
+    const container = form.querySelector('#' + containerId);
+    const input = form.querySelector('#' + inputId);
+    if (!container || !input) return;
+    container.style.display = 'none';
+    container.innerHTML = '';
+    input.style.display = 'block';
+    input.value = '';
+    const wrapper = input.closest('.search-field-wrapper');
+    if (wrapper) wrapper.style.display = 'block';
+    const results = form.querySelector('#' + resultsId);
+    if (results) results.style.display = 'none';
+    const hiddenInputId = containerId + 'Id';
+    const hiddenInput = form.querySelector('#' + hiddenInputId);
+    if (hiddenInput) hiddenInput.value = '';
+    const submitBtn = form.querySelector('#submitAppointmentSetupBtn');
+    if (submitBtn) submitBtn.disabled = true;
+    input.focus();
+}
 
+function handleAppointmentSetupSubmit(form) {
+    const companyId = form.querySelector('#selectedCompanyId')?.value || form.getAttribute('data-company-id') || window.selectedCompanyForAppointment?.id;
+    const company = mockCompanies.find(c => c.id === companyId);
     const appointeeId = form.querySelector('#selectedAppointeeId')?.value;
     const appointee = mockAppointees.find(a => a.id === appointeeId) || mockPeople.find(p => p.id === appointeeId);
-
     const hasConsent = form.querySelector('#hasConsentToAct')?.value || 'yes';
+    const effectiveDate = form.querySelector('#effectiveDate')?.value || new Date().toISOString().slice(0, 10);
 
     if (!company || !appointee) return;
     disableButtonsInElement(form);
@@ -1453,7 +1548,8 @@ function handleAppointeeFormSubmit(form) {
     window.selectedAppointment = {
         company, director: null, appointee,
         isReplacement: false,
-        hasConsentToAct: hasConsent === 'yes'
+        hasConsentToAct: hasConsent === 'yes',
+        effectiveDate: effectiveDate || null
     };
 
     if (currentChatId) {
@@ -1689,86 +1785,28 @@ function handleAddPersonFormSubmit() {
     
     if (currentChatId) {
         addMessageToChat(currentChatId, 'user', `Added ${fullName} to the Entities system`);
-        
+        const company = window.selectedCompanyForAppointment;
         setTimeout(() => {
-            const consentUI = `
-                <p style="margin-bottom: var(--space-4);">Great! I've added <strong>${fullName}</strong> (${newPerson.title}) to the Entities system. Now, do you have a Consent to Act for this appointee?</p>
-                <div class="hybrid-form" id="newPersonConsentForm">
-                    <div class="form-field">
-                        <label class="form-label">Do you have a Consent to Act for this appointee?</label>
-                        <div class="consent-toggle" id="newPersonConsentToggle">
-                            <button type="button" class="consent-btn" data-value="yes" id="newPersonConsentYes">Yes</button>
-                            <button type="button" class="consent-btn" data-value="no" id="newPersonConsentNo">No</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            addMessageToChat(currentChatId, 'assistant', consentUI);
-            
+            // Re-present the consolidated form with company + new appointee as chips
+            const response = generateAppointmentSetupStep(company || null, newPerson);
+            addMessageToChat(currentChatId, 'assistant', response);
             setTimeout(() => {
-                    const consentForms = document.querySelectorAll('#newPersonConsentForm');
-                    const consentForm = consentForms[consentForms.length - 1];
-                    if (!consentForm) return;
-                    
-                    const yesBtn = consentForm.querySelector('#newPersonConsentYes');
-                    const noBtn = consentForm.querySelector('#newPersonConsentNo');
-                    
-                    function handleConsentChoice(value) {
-                        // Visual feedback
-                        if (value === 'yes') {
-                            yesBtn.classList.add('consent-btn-active');
-                        } else {
-                            noBtn.classList.add('consent-btn-active');
-                        }
-                        
-                        // Disable both buttons
-                        yesBtn.disabled = true;
-                        noBtn.disabled = true;
-                        yesBtn.style.pointerEvents = 'none';
-                        noBtn.style.pointerEvents = 'none';
-                        
-                        // Store the consent value on the new person object
-                        window._newPersonConsent = value === 'yes';
-                        
-                        // Echo user choice
-                        addMessageToChat(currentChatId, 'user', value === 'yes' ? 'Yes' : 'No');
-                        
-                        // Proceed to appointee selection with consent already answered
-                        setTimeout(() => {
-                            returnToAppointmentFormWithConsent(newPerson, value === 'yes');
-                            
-                            setTimeout(() => {
-                                const chatThread = document.getElementById('chatThread');
-                                if (chatThread) chatThread.scrollTop = chatThread.scrollHeight;
-                            }, 400);
-                        }, 400);
-                    }
-                    
-                    if (yesBtn) yesBtn.addEventListener('click', () => handleConsentChoice('yes'));
-                    if (noBtn) noBtn.addEventListener('click', () => handleConsentChoice('no'));
-                }, 150);
+                const chatThread = document.getElementById('chatThread');
+                if (chatThread) chatThread.scrollTop = chatThread.scrollHeight;
+            }, 200);
         }, 400);
     }
 }
 
 function returnToAppointmentForm(newlyAddedPerson = null) {
     const company = window.selectedCompanyForAppointment;
-    
-    if (company && newlyAddedPerson && currentChatId) {
-        const response = generateAppointeeSelectionStep(company, newlyAddedPerson);
-        addMessageToChat(currentChatId, 'assistant', response);
-        
-        setTimeout(() => {
-            const chatThread = document.getElementById('chatThread');
-            if (chatThread) chatThread.scrollTop = chatThread.scrollHeight;
-        }, 200);
-    } else if (company && currentChatId) {
-        const response = generateAppointeeSelectionStep(company);
-        addMessageToChat(currentChatId, 'assistant', response);
-    } else if (currentChatId) {
-        const response = generateCompanySelectionStep();
-        addMessageToChat(currentChatId, 'assistant', response);
-    }
+    if (!currentChatId) return;
+    const response = generateAppointmentSetupStep(company || null, newlyAddedPerson || null);
+    addMessageToChat(currentChatId, 'assistant', response);
+    setTimeout(() => {
+        const chatThread = document.getElementById('chatThread');
+        if (chatThread) chatThread.scrollTop = chatThread.scrollHeight;
+    }, 200);
 }
 
 function returnToAppointmentFormWithConsent(newlyAddedPerson, hasConsent) {
@@ -1795,11 +1833,11 @@ function returnToAppointmentFormWithConsent(newlyAddedPerson, hasConsent) {
     }, 400);
 }
 
-// Legacy redirect
+// Legacy redirect (e.g. from panel or other triggers)
 function handleAppointDirectorFormSubmit() {
-    const forms = document.querySelectorAll('#appointeeSelectionForm');
+    const forms = document.querySelectorAll('#appointmentSetupForm');
     const form = forms[forms.length - 1];
-    if (form) handleAppointeeFormSubmit(form);
+    if (form) handleAppointmentSetupSubmit(form);
 }
 
 function openAppointmentPanel() {
@@ -1942,7 +1980,7 @@ function reopenStatusPanel() {
 }
 
 function generateAppointmentPanelContent() {
-    const { company, director, appointee, isReplacement, hasConsentToAct } = window.selectedAppointment || {};
+    const { company, director, appointee, isReplacement, hasConsentToAct, effectiveDate } = window.selectedAppointment || {};
     
     if (!company || !appointee) {
         return '<p>Error: Appointment data not found</p>';
@@ -1988,6 +2026,12 @@ function generateAppointmentPanelContent() {
                         <span class="summary-key"></span>
                         <span class="summary-val-meta">${appointee.title}</span>
                     </div>
+                    ${effectiveDate ? `
+                    <div class="summary-row">
+                        <span class="summary-key">Effective Date</span>
+                        <span class="summary-val">${effectiveDate}</span>
+                    </div>
+                    ` : ''}
                 </div>
             </section>
 
@@ -2704,7 +2748,8 @@ function startAppointmentWorkflow() {
         appointee: appointee.name,
         appointeeTitle: appointee.title,
         isReplacement: isReplacement,
-        hasConsentToAct: window.selectedAppointment?.hasConsentToAct ?? true
+        hasConsentToAct: window.selectedAppointment?.hasConsentToAct ?? true,
+        effectiveDate: window.selectedAppointment?.effectiveDate || null
     };
     
     // Build entity update substeps based on appointment type
@@ -3706,6 +3751,12 @@ function generateCompletionPanel() {
                         <span class="summary-key">Consent to Act</span>
                         <span class="summary-val">${currentAppointment.hasConsentToAct ? '<span style="color: var(--color-green-700);">Yes</span>' : '<span style="color: var(--color-gray-500);">No</span>'}</span>
                     </div>
+                    ${currentAppointment.effectiveDate ? `
+                    <div class="summary-row">
+                        <span class="summary-key">Effective Date</span>
+                        <span class="summary-val">${currentAppointment.effectiveDate}</span>
+                    </div>
+                    ` : ''}
                 </div>
             </section>
 
