@@ -1421,17 +1421,9 @@ function initializeAppointmentSetupForm(form) {
                 </div>
             `,
             (item) => {
-                const companyId = getHiddenValue('selectedCompanyId') || form.getAttribute('data-company-id') || window.selectedCompanyForAppointment?.id;
-                const company = mockCompanies.find(c => c.id === companyId);
-                const appointee = mockAppointees.find(a => a.id === item.id) || mockPeople.find(p => p.id === item.id);
-                if (!company || !appointee || !currentChatId) return;
-                disableButtonsInElement(form);
-                addMessageToChat(currentChatId, 'user', `${company.flag} ${company.name} — ${appointee.name}`);
-                window.selectedCompanyForAppointment = company;
-                setTimeout(() => {
-                    const response = generateAppointmentSetupStep(company, appointee);
-                    addMessageToChat(currentChatId, 'assistant', response);
-                }, 400);
+                setHiddenValue('selectedAppointeeId', item.id);
+                showSelectedItemInForm(form, 'selectedAppointee', item.name, 'appointeeSearch', 'appointeeResults');
+                checkFormCompletion();
             },
             {
                 html: `
