@@ -1237,19 +1237,18 @@ function generateAppointDirectorForm(appointmentType = 'replace', savedState = {
     return generateAppointmentSetupStep();
 }
 
-// Consolidated single step: Company, Appointee, Consent to Act, Effective Date.
-// When company/appointee are provided, show as chips; otherwise show search fields.
-function generateAppointmentSetupStep(company = null, appointee = null, consent = null, effectiveDate = '') {
+// Consolidated step: Company, Appointee, Effective Date.
+// Consent to Act is collected as a separate follow-up step.
+function generateAppointmentSetupStep(company = null, appointee = null, effectiveDate = '') {
     const hasCompany = company && company.id;
     const hasAppointee = appointee && appointee.id;
-    const consentVal = consent === true ? 'yes' : consent === false ? 'no' : '';
     const today = new Date().toISOString().slice(0, 10);
     return `
         <h3 style="margin-bottom: var(--space-3); color: var(--color-gray-900);">Add a New Director</h3>
         <p style="margin-bottom: var(--space-5); line-height: var(--leading-normal); color: var(--color-gray-700);">
             ${hasCompany && hasAppointee
-                ? 'Review your selections and complete Consent to Act and Effective Date, then continue.'
-                : 'Select the company and appointee, then confirm Consent to Act and the effective date.'}
+                ? 'Review your selections and confirm the effective date, then continue.'
+                : 'Select the company and appointee, confirm the effective date, then continue.'}
         </p>
         
         <form id="appointmentSetupForm" class="hybrid-form" data-company-id="${hasCompany ? company.id : ''}">
@@ -1310,17 +1309,25 @@ function generateAppointmentSetupStep(company = null, appointee = null, consent 
             </div>
 
             <div class="form-field">
-                <label class="form-label">Do you have a Consent to Act for this appointee?</label>
-                <div class="consent-toggle" id="consentToggle">
-                    <button type="button" class="consent-btn ${consentVal === 'yes' ? 'consent-btn-active' : ''}" data-value="yes" id="consentYesBtn">Yes</button>
-                    <button type="button" class="consent-btn ${consentVal === 'no' ? 'consent-btn-active' : ''}" data-value="no" id="consentNoBtn">No</button>
-                </div>
-                <input type="hidden" id="hasConsentToAct" value="${consentVal}" />
-            </div>
-
-            <div class="form-field">
                 <label class="form-label">Effective Date</label>
-                <input type="date" id="effectiveDate" class="search-input" value="${effectiveDate || today}" />
+                <div class="datepicker-wrapper" id="effectiveDatePicker">
+                    <input 
+                        type="text" 
+                        id="effectiveDateDisplay" 
+                        class="search-input datepicker-input" 
+                        placeholder="Select a date..." 
+                        readonly 
+                        autocomplete="off"
+                    />
+                    <svg class="datepicker-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <input type="hidden" id="effectiveDate" value="${effectiveDate || today}" />
+                    <div class="datepicker-dropdown" id="effectiveDateDropdown"></div>
+                </div>
             </div>
 
             <div class="form-actions">
@@ -1328,6 +1335,22 @@ function generateAppointmentSetupStep(company = null, appointee = null, consent 
                 <button type="submit" class="form-btn-primary" id="submitAppointmentSetupBtn" disabled>Continue</button>
             </div>
         </form>
+    `;
+}
+
+function generateConsentToActStep(company, appointee) {
+    return `
+        <p style="margin-bottom: var(--space-4); line-height: var(--leading-normal); color: var(--color-gray-700);">
+            Do you have a <strong>Consent to Act</strong> on file for <strong>${appointee.name}</strong>?
+        </p>
+        <div class="hybrid-form" id="consentToActForm">
+            <div class="form-field">
+                <div class="consent-toggle" id="consentToggle">
+                    <button type="button" class="consent-btn" data-value="yes" id="consentYesBtn">Yes</button>
+                    <button type="button" class="consent-btn" data-value="no" id="consentNoBtn">No</button>
+                </div>
+            </div>
+        </div>
     `;
 }
 
@@ -1359,16 +1382,8 @@ function initializeAppointmentSetupForm(form) {
     function checkFormCompletion() {
         const companyId = getHiddenValue('selectedCompanyId');
         const appointeeId = getHiddenValue('selectedAppointeeId');
-        const consentValue = getHiddenValue('hasConsentToAct');
         const dateVal = effectiveDateInput ? effectiveDateInput.value : '';
-        submitBtn.disabled = !(companyId && appointeeId && consentValue && dateVal);
-    }
-
-    // Default consent to "yes" so form can be completed once company + appointee are set
-    if (!getHiddenValue('hasConsentToAct')) {
-        setHiddenValue('hasConsentToAct', 'yes');
-        const consentYes = form.querySelector('#consentYesBtn');
-        if (consentYes) consentYes.classList.add('consent-btn-active');
+        submitBtn.disabled = !(companyId && appointeeId && dateVal);
     }
 
     // Company search (always attach so it works after clearing chip)
@@ -1433,31 +1448,10 @@ function initializeAppointmentSetupForm(form) {
         );
     }
 
-    // Consent toggle
-    const consentYesBtn = form.querySelector('#consentYesBtn');
-    const consentNoBtn = form.querySelector('#consentNoBtn');
-    if (consentYesBtn) {
-        consentYesBtn.addEventListener('click', (e) => {
-            e.preventDefault(); e.stopPropagation();
-            setHiddenValue('hasConsentToAct', 'yes');
-            consentYesBtn.classList.add('consent-btn-active');
-            if (consentNoBtn) consentNoBtn.classList.remove('consent-btn-active');
-            checkFormCompletion();
-        });
-    }
-    if (consentNoBtn) {
-        consentNoBtn.addEventListener('click', (e) => {
-            e.preventDefault(); e.stopPropagation();
-            setHiddenValue('hasConsentToAct', 'no');
-            consentNoBtn.classList.add('consent-btn-active');
-            if (consentYesBtn) consentYesBtn.classList.remove('consent-btn-active');
-            checkFormCompletion();
-        });
-    }
-
-    if (effectiveDateInput) {
-        effectiveDateInput.addEventListener('change', checkFormCompletion);
-        effectiveDateInput.addEventListener('input', checkFormCompletion);
+    // Initialize custom date picker
+    const datepickerWrapper = form.querySelector('#effectiveDatePicker');
+    if (datepickerWrapper) {
+        initializeDatepicker(datepickerWrapper, effectiveDateInput, checkFormCompletion);
     }
 
     form.addEventListener('submit', (e) => {
@@ -1539,28 +1533,185 @@ function handleAppointmentSetupSubmit(form) {
     const company = mockCompanies.find(c => c.id === companyId);
     const appointeeId = form.querySelector('#selectedAppointeeId')?.value;
     const appointee = mockAppointees.find(a => a.id === appointeeId) || mockPeople.find(p => p.id === appointeeId);
-    const hasConsent = form.querySelector('#hasConsentToAct')?.value || 'yes';
     const effectiveDate = form.querySelector('#effectiveDate')?.value || new Date().toISOString().slice(0, 10);
 
     if (!company || !appointee) return;
     disableButtonsInElement(form);
 
-    window.selectedAppointment = {
-        company, director: null, appointee,
-        isReplacement: false,
-        hasConsentToAct: hasConsent === 'yes',
-        effectiveDate: effectiveDate || null
-    };
+    window.selectedCompanyForAppointment = company;
+    window._pendingAppointment = { company, appointee, effectiveDate };
 
     if (currentChatId) {
-        addMessageToChat(currentChatId, 'user', `Adding ${appointee.name} to the board`);
+        addMessageToChat(currentChatId, 'user', `${company.flag} ${company.name} — ${appointee.name} — ${effectiveDate}`);
+        setTimeout(() => {
+            const response = generateConsentToActStep(company, appointee);
+            addMessageToChat(currentChatId, 'assistant', response);
+            setTimeout(() => initializeConsentToActStep(), 150);
+        }, 400);
+    }
+}
+
+function initializeConsentToActStep() {
+    const forms = document.querySelectorAll('#consentToActForm');
+    const form = forms[forms.length - 1];
+    if (!form || form._initialized) return;
+    form._initialized = true;
+
+    const yesBtn = form.querySelector('#consentYesBtn');
+    const noBtn = form.querySelector('#consentNoBtn');
+
+    function handleConsentChoice(value) {
+        if (value === 'yes') {
+            yesBtn.classList.add('consent-btn-active');
+        } else {
+            noBtn.classList.add('consent-btn-active');
+        }
+        yesBtn.disabled = true;
+        noBtn.disabled = true;
+        yesBtn.style.pointerEvents = 'none';
+        noBtn.style.pointerEvents = 'none';
+
+        const pending = window._pendingAppointment;
+        if (!pending || !currentChatId) return;
+
+        addMessageToChat(currentChatId, 'user', value === 'yes' ? 'Yes' : 'No');
+
+        window.selectedAppointment = {
+            company: pending.company,
+            director: null,
+            appointee: pending.appointee,
+            isReplacement: false,
+            hasConsentToAct: value === 'yes',
+            effectiveDate: pending.effectiveDate || null
+        };
+
         setTimeout(() => {
             addMessageToChat(currentChatId, 'assistant',
-                `<div><p>Perfect. I'm preparing the appointment workflow for ${company.name}.</p></div>`
+                `<div><p>Perfect. I'm preparing the appointment workflow for ${pending.company.name}.</p></div>`
             );
             openAppointmentPanel();
         }, 400);
     }
+
+    if (yesBtn) yesBtn.addEventListener('click', () => handleConsentChoice('yes'));
+    if (noBtn) noBtn.addEventListener('click', () => handleConsentChoice('no'));
+}
+
+// ============================================
+// CUSTOM DATE PICKER
+// ============================================
+
+function initializeDatepicker(wrapper, hiddenInput, onChange) {
+    const display = wrapper.querySelector('#effectiveDateDisplay');
+    const dropdown = wrapper.querySelector('#effectiveDateDropdown');
+    let currentMonth, currentYear;
+
+    const initialVal = hiddenInput.value;
+    if (initialVal) {
+        const d = new Date(initialVal + 'T00:00:00');
+        currentMonth = d.getMonth();
+        currentYear = d.getFullYear();
+        display.value = formatDateDisplay(d);
+    } else {
+        const now = new Date();
+        currentMonth = now.getMonth();
+        currentYear = now.getFullYear();
+    }
+
+    function formatDateDisplay(date) {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatDateValue(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function renderCalendar() {
+        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        const dayLabels = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+        const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const selectedVal = hiddenInput.value;
+
+        let html = `
+            <div class="dp-header">
+                <button type="button" class="dp-nav" data-dir="prev">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <span class="dp-month-year">${monthNames[currentMonth]} ${currentYear}</span>
+                <button type="button" class="dp-nav" data-dir="next">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+            </div>
+            <div class="dp-grid">
+                ${dayLabels.map(d => `<span class="dp-day-label">${d}</span>`).join('')}
+        `;
+
+        for (let i = 0; i < firstDay; i++) {
+            html += '<span class="dp-day dp-empty"></span>';
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(currentYear, currentMonth, day);
+            const val = formatDateValue(date);
+            const isToday = date.getTime() === today.getTime();
+            const isSelected = val === selectedVal;
+            let cls = 'dp-day';
+            if (isToday) cls += ' dp-today';
+            if (isSelected) cls += ' dp-selected';
+            html += `<button type="button" class="${cls}" data-date="${val}">${day}</button>`;
+        }
+
+        html += '</div>';
+        dropdown.innerHTML = html;
+
+        dropdown.querySelectorAll('.dp-nav').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (btn.dataset.dir === 'prev') {
+                    currentMonth--;
+                    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+                } else {
+                    currentMonth++;
+                    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+                }
+                renderCalendar();
+            });
+        });
+
+        dropdown.querySelectorAll('.dp-day[data-date]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const val = btn.dataset.date;
+                hiddenInput.value = val;
+                const d = new Date(val + 'T00:00:00');
+                display.value = formatDateDisplay(d);
+                dropdown.classList.remove('dp-open');
+                if (onChange) onChange();
+            });
+        });
+    }
+
+    display.addEventListener('click', (e) => {
+        e.stopPropagation();
+        renderCalendar();
+        dropdown.classList.toggle('dp-open');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!wrapper.contains(e.target)) {
+            dropdown.classList.remove('dp-open');
+        }
+    });
+
+    if (onChange) onChange();
 }
 
 function setupSearchField(input, resultsDiv, data, formatItem, onSelect, addAction = null) {
